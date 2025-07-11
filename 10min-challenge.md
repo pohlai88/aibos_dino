@@ -87,13 +87,13 @@
 
 ## ✅ Challenge Tasks
 
-- [ ] Create React + Tailwind frontend structure
-- [ ] Build desktop background and taskbar
-- [ ] Create draggable window system
-- [ ] Implement basic apps (File Explorer, Notepad, Calculator)
-- [ ] Add desktop icons and start menu
-- [ ] Deploy to Deno Deploy
-- [ ] Test all functionality
+- [x] Create React + Tailwind frontend structure
+- [x] Build desktop background and taskbar
+- [x] Create draggable window system
+- [x] Implement basic apps (File Explorer, Notepad, Calculator)
+- [x] Add desktop icons and start menu
+- [x] Deploy to Deno Deploy
+- [x] Test all functionality
 
 ## ✅ Challenge Progress
 
@@ -113,8 +113,8 @@
 - [x] Calculator app
 
 **Phase 4: Deploy (9-10 minutes)**
-- [ ] Deploy to Deno Deploy
-- [ ] Test live application
+- [x] Deploy to Deno Deploy
+- [x] Test live application
 
 ---
 

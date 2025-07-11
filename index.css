@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #f7f8fa;
+  color: #22223b;
+  font-family: 'Inter', 'SF Pro', 'Segoe UI', Arial, sans-serif;
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e0e3e8;
+}
+::-webkit-scrollbar-thumb {
+  background: #a3bffa;
+  border-radius: 4px;
+} 
