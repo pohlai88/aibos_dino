@@ -1,0 +1,17 @@
+{
+  "deploy": {
+    "project": "0f686c75-8f47-4d96-bccf-e240b9704a8b",
+    "exclude": [
+      "**/node_modules",
+      "**/node_modules"
+    ],
+    "include": [
+      "main.ts",
+      "dist/**"
+    ],
+    "entrypoint": "main.ts"
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.208.0/"
+  }
+}
