@@ -1,256 +1,261 @@
-#!/usr/bin/env -S deno run --allow-all
+#!/usr/bin/env -S deno run --allow-read --allow-run
 
-/**
- * AIBOS Performance Optimization Script
- * 
- * This script performs comprehensive optimization of all TypeScript and TSX files:
- * 1. Type checking and error resolution
- * 2. Performance optimization
- * 3. Code quality improvements
- * 4. Bundle size optimization
- */
-
-import { walk } from "https://deno.land/std@0.208.0/fs/mod.ts";
+import { walk } from "https://deno.land/std@0.208.0/fs/walk.ts";
 import { join } from "https://deno.land/std@0.208.0/path/mod.ts";
+import * as colors from "https://deno.land/std@0.208.0/fmt/colors.ts";
 
 interface OptimizationResult {
   file: string;
-  status: 'success' | 'error' | 'warning';
+  status: "success" | "error" | "warning";
   message: string;
   optimizations?: string[];
 }
 
+interface OptimizationReport {
+  timestamp: string;
+  durationMs: number;
+  results: OptimizationResult[];
+}
+
 class PerformanceOptimizer {
-  private results: OptimizationResult[] = [];
-  private startTime = Date.now();
+  private readonly results: OptimizationResult[] = [];
+  private readonly startTime = Date.now();
 
   async run(): Promise<void> {
-    console.log('🚀 Starting AIBOS Performance Optimization...\n');
-    
+    this.logSection("🚀 Starting AIBOS Performance Optimization");
+
     try {
-      // Step 1: Type checking
-      await this.performTypeChecking();
-      
-      // Step 2: File optimization
+      await this.typeCheck();
       await this.optimizeFiles();
-      
-      // Step 3: Performance analysis
       await this.analyzePerformance();
-      
-      // Step 4: Generate report
-      this.generateReport();
-      
+      await this.generateReports();
+
+      this.finish(true);
     } catch (error) {
-      console.error('❌ Optimization failed:', error);
-      Deno.exit(1);
+      console.error(colors.red(`❌ Optimization failed: ${error instanceof Error ? error.message : error}`));
+      this.finish(false);
     }
   }
 
-  private async performTypeChecking(): Promise<void> {
-    console.log('📋 Step 1: Type Checking...');
-    
-    const process = new Deno.Command('deno', {
-      args: ['check', '--all'],
-      stdout: 'piped',
-      stderr: 'piped',
+  private async typeCheck(): Promise<void> {
+    this.logStep("Step 1: Type Checking");
+
+    const process = new Deno.Command("deno", {
+      args: ["check", "--all"],
+      stdout: "piped",
+      stderr: "piped",
     });
-    
+
     const { code, stdout, stderr } = await process.output();
     const output = new TextDecoder().decode(stdout);
     const errors = new TextDecoder().decode(stderr);
-    
+
     if (code === 0) {
-      this.results.push({
-        file: 'TypeScript Check',
-        status: 'success',
-        message: 'All TypeScript files passed type checking',
-        optimizations: ['Type safety verified']
+      this.record({
+        file: "TypeScript Check",
+        status: "success",
+        message: "All TypeScript files passed type checking",
+        optimizations: ["Type safety verified"],
       });
-      console.log('✅ Type checking passed');
+      this.logSuccess("✅ Type checking passed.");
     } else {
-      this.results.push({
-        file: 'TypeScript Check',
-        status: 'error',
-        message: 'TypeScript errors found',
-        optimizations: ['Errors need to be resolved']
+      this.record({
+        file: "TypeScript Check",
+        status: "error",
+        message: "TypeScript errors found",
+        optimizations: ["Resolve errors to proceed"],
       });
-      console.log('❌ Type checking failed');
-      console.log(errors);
+      this.logError("❌ Type checking failed:\n" + errors);
     }
   }
 
   private async optimizeFiles(): Promise<void> {
-    console.log('\n🔧 Step 2: File Optimization...');
-    
+    this.logStep("Step 2: File Optimization");
+
     const tsFiles = await this.findTypeScriptFiles();
-    
+
     for (const file of tsFiles) {
       try {
-        const optimizations = await this.optimizeFile(file);
-        this.results.push({
+        const optimizations = await this.analyzeFile(file);
+        this.record({
           file,
-          status: 'success',
-          message: `Optimized ${file}`,
-          optimizations
+          status: "success",
+          message: `Optimizations completed for ${file}`,
+          optimizations,
         });
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.results.push({
+      } catch (e) {
+        this.record({
           file,
-          status: 'error',
-          message: `Failed to optimize ${file}: ${errorMessage}`
+          status: "error",
+          message: `Failed to optimize ${file}: ${e instanceof Error ? e.message : e}`,
         });
       }
     }
   }
 
-  private async findTypeScriptFiles(): Promise<string[]> {
-    const files: string[] = [];
-    
-    for await (const entry of walk('.', {
-      exts: ['.ts', '.tsx'],
-      skip: [/node_modules/, /\.git/, /dist/, /build/]
-    })) {
-      files.push(entry.path);
-    }
-    
-    return files;
-  }
-
-  private async optimizeFile(filePath: string): Promise<string[]> {
+  private async analyzeFile(path: string): Promise<string[]> {
     const optimizations: string[] = [];
-    const content = await Deno.readTextFile(filePath);
-    
-    // Check for common optimization opportunities
-    if (content.includes('React.memo')) {
-      optimizations.push('React.memo already used');
-    } else if (content.includes('export const') && content.includes('React.FC')) {
-      optimizations.push('Consider adding React.memo for performance');
+    const code = await Deno.readTextFile(path);
+
+    if (code.includes("React.memo")) {
+      optimizations.push("React.memo already used");
+    } else if (code.includes("export const") && code.includes("React.FC")) {
+      optimizations.push("Consider adding React.memo for performance");
     }
-    
-    if (content.includes('useEffect') && !content.includes('useCallback')) {
-      optimizations.push('Consider using useCallback for effect dependencies');
+
+    if (code.includes("useEffect") && !code.includes("useCallback")) {
+      optimizations.push("Consider using useCallback to avoid unnecessary re-renders");
     }
-    
-    if (content.includes('useState') && content.includes('useMemo')) {
-      optimizations.push('useMemo already used for expensive calculations');
+
+    if (code.includes("useState") && code.includes("useMemo")) {
+      optimizations.push("useMemo already used for expensive calculations");
     }
-    
-    if (content.includes('console.log')) {
-      optimizations.push('Remove console.log statements in production');
+
+    if (code.includes("console.log")) {
+      optimizations.push("Consider removing console.log statements in production");
     }
-    
+
     return optimizations;
   }
 
   private async analyzePerformance(): Promise<void> {
-    console.log('\n📊 Step 3: Performance Analysis...');
-    
-    // Analyze bundle size
-    const bundleSize = await this.estimateBundleSize();
-    
-    this.results.push({
-      file: 'Bundle Analysis',
-      status: 'success',
-      message: `Estimated bundle size: ${bundleSize}KB`,
+    this.logStep("Step 3: Performance Analysis");
+
+    const bundleSizeKB = await this.estimateBundleSize();
+
+    this.record({
+      file: "Bundle Size Estimate",
+      status: "success",
+      message: `Estimated bundle size: ${bundleSizeKB}KB`,
       optimizations: [
-        'Consider code splitting for large components',
-        'Use dynamic imports for lazy loading',
-        'Optimize images and assets'
-      ]
+        "Consider code splitting for large components",
+        "Use dynamic imports for lazy loading",
+        "Optimize images and static assets",
+      ],
     });
-    
-    // Memory usage analysis
-    const memoryUsage = (performance as any).memory ? {
-      used: Math.round((performance as any).memory.usedJSHeapSize / 1024 / 1024),
-      total: Math.round((performance as any).memory.totalJSHeapSize / 1024 / 1024),
-      limit: Math.round((performance as any).memory.jsHeapSizeLimit / 1024 / 1024)
-    } : null;
-    
-    if (memoryUsage) {
-      this.results.push({
-        file: 'Memory Usage',
-        status: 'success',
-        message: `Memory: ${memoryUsage.used}MB / ${memoryUsage.total}MB`,
+
+    // Simulated memory usage check (browser-specific; skip in Deno runtime)
+    const memoryInfo = (performance as any).memory;
+    if (memoryInfo) {
+      this.record({
+        file: "Memory Usage",
+        status: "success",
+        message: `Memory usage: ${memoryInfo.usedJSHeapSize / (1024 * 1024)} MB`,
         optimizations: [
-          'Monitor memory leaks in components',
-          'Use proper cleanup in useEffect',
-          'Avoid creating objects in render'
-        ]
+          "Monitor memory leaks in React components",
+          "Clean up side effects in useEffect hooks",
+        ],
       });
     }
   }
 
   private async estimateBundleSize(): Promise<number> {
-    // Simple estimation based on file sizes
-    let totalSize = 0;
-    const tsFiles = await this.findTypeScriptFiles();
-    
-    for (const file of tsFiles) {
+    let sizeBytes = 0;
+    const files = await this.findTypeScriptFiles();
+
+    for (const file of files) {
       const stat = await Deno.stat(file);
-      totalSize += stat.size;
+      sizeBytes += stat.size;
     }
-    
-    // Rough estimation: TypeScript files are typically 3-5x larger when compiled
-    return Math.round(totalSize * 4 / 1024);
+
+    // Rough estimate: compiled bundles grow 3-5x
+    return Math.round((sizeBytes * 4) / 1024);
   }
 
-  private generateReport(): void {
-    console.log('\n📈 Step 4: Optimization Report...\n');
-    
-    const duration = Date.now() - this.startTime;
-    const successCount = this.results.filter(r => r.status === 'success').length;
-    const errorCount = this.results.filter(r => r.status === 'error').length;
-    const warningCount = this.results.filter(r => r.status === 'warning').length;
-    
-    console.log('='.repeat(60));
-    console.log('🎯 AIBOS OPTIMIZATION REPORT');
-    console.log('='.repeat(60));
-    console.log(`⏱️  Duration: ${duration}ms`);
-    console.log(`✅ Success: ${successCount}`);
-    console.log(`❌ Errors: ${errorCount}`);
-    console.log(`⚠️  Warnings: ${warningCount}`);
-    console.log('');
-    
-    // Group results by status
-    const errors = this.results.filter(r => r.status === 'error');
-    const warnings = this.results.filter(r => r.status === 'warning');
-    const successes = this.results.filter(r => r.status === 'success');
-    
-    if (errors.length > 0) {
-      console.log('❌ ERRORS:');
-      errors.forEach(error => {
-        console.log(`  • ${error.file}: ${error.message}`);
-      });
-      console.log('');
-    }
-    
-    if (warnings.length > 0) {
-      console.log('⚠️  WARNINGS:');
-      warnings.forEach(warning => {
-        console.log(`  • ${warning.file}: ${warning.message}`);
-      });
-      console.log('');
-    }
-    
-    console.log('✅ OPTIMIZATIONS APPLIED:');
-    successes.forEach(success => {
-      console.log(`  • ${success.file}: ${success.message}`);
-      if (success.optimizations) {
-        success.optimizations.forEach(opt => {
-          console.log(`    - ${opt}`);
-        });
+  private async findTypeScriptFiles(): Promise<string[]> {
+    const files: string[] = [];
+
+    for await (const entry of walk(".", {
+      exts: [".ts", ".tsx"],
+      skip: [/node_modules/, /\.git/, /dist/, /build/],
+    })) {
+      if (entry.isFile) {
+        files.push(entry.path);
       }
-    });
-    
-    console.log('\n' + '='.repeat(60));
-    
-    if (errorCount === 0) {
-      console.log('🎉 All optimizations completed successfully!');
-    } else {
-      console.log('⚠️  Some issues need attention. Please review the errors above.');
     }
-    console.log('='.repeat(60));
+
+    return files;
+  }
+
+  private async generateReports(): Promise<void> {
+    this.logStep("Step 4: Generating Reports");
+
+    const duration = Date.now() - this.startTime;
+
+    const report: OptimizationReport = {
+      timestamp: new Date().toISOString(),
+      durationMs: duration,
+      results: this.results,
+    };
+
+    const jsonPath = "optimization-report.json";
+    await Deno.writeTextFile(jsonPath, JSON.stringify(report, null, 2));
+
+    this.logSuccess(`JSON report saved: ${jsonPath}`);
+    this.displaySummary();
+  }
+
+  private displaySummary(): void {
+    const errors = this.results.filter((r) => r.status === "error");
+    const warnings = this.results.filter((r) => r.status === "warning");
+    const successes = this.results.filter((r) => r.status === "success");
+
+    console.log(colors.cyan("\n" + "=".repeat(60)));
+    console.log(colors.bold(colors.cyan("🎯 AIBOS OPTIMIZATION REPORT")));
+    console.log(colors.cyan("=".repeat(60)));
+
+    console.log(`✅ Successful optimizations: ${successes.length}`);
+    console.log(`⚠️  Warnings: ${warnings.length}`);
+    console.log(`❌ Errors: ${errors.length}`);
+
+    if (errors.length > 0) {
+      console.log(colors.red("\n❌ ERRORS:"));
+      errors.forEach((e) => console.log(`  • ${e.file}: ${e.message}`));
+    }
+
+    if (warnings.length > 0) {
+      console.log(colors.yellow("\n⚠️  WARNINGS:"));
+      warnings.forEach((w) => console.log(`  • ${w.file}: ${w.message}`));
+    }
+
+    console.log(colors.green("\n✅ OPTIMIZATIONS:"));
+    successes.forEach((s) => {
+      console.log(`  • ${s.file}: ${s.message}`);
+      s.optimizations?.forEach((opt) => console.log(`     - ${opt}`));
+    });
+
+    console.log(colors.cyan("\n" + "=".repeat(60)));
+  }
+
+  private finish(success: boolean): void {
+    console.log(
+      success
+        ? colors.green("🎉 Optimization completed successfully!")
+        : colors.red("⚠️  Optimization completed with errors.")
+    );
+    Deno.exit(success ? 0 : 1);
+  }
+
+  private record(result: OptimizationResult) {
+    this.results.push(result);
+  }
+
+  private logSection(msg: string) {
+    console.log("\n" + colors.bold(colors.cyan("=".repeat(60))));
+    console.log(colors.bold(colors.cyan(msg)));
+    console.log(colors.bold(colors.cyan("=".repeat(60))));
+  }
+
+  private logStep(msg: string) {
+    console.log(colors.yellow(`\n🔧 ${msg}`));
+  }
+
+  private logSuccess(msg: string) {
+    console.log(colors.green(`✅ ${msg}`));
+  }
+
+  private logError(msg: string) {
+    console.log(colors.red(msg));
   }
 }
 
@@ -258,4 +263,4 @@ class PerformanceOptimizer {
 if (import.meta.main) {
   const optimizer = new PerformanceOptimizer();
   await optimizer.run();
-} 
+}

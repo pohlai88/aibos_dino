@@ -1,23 +1,12 @@
 #!/usr/bin/env -S deno run --allow-net --allow-read --allow-write --allow-env
 
-/**
- * AIBOS Migration Script: In-Memory to Supabase
- * 
- * This script helps migrate your existing in-memory file system data to Supabase.
- * It will:
- * 1. Read your existing file system data
- * 2. Create the Supabase schema
- * 3. Migrate all files and folders
- * 4. Preserve file content and metadata
- * 5. Verify the migration
- */
-
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import * as colors from "https://deno.land/std@0.220.1/fmt/colors.ts";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 interface FileItem {
   id: string;
   name: string;
-  type: 'file' | 'folder';
+  type: "file" | "folder";
   size: number;
   path: string;
   created: string;
@@ -34,19 +23,28 @@ interface MigrationConfig {
   dryRun?: boolean;
 }
 
+interface MigrationReport {
+  timestamp: string;
+  migratedItems: number;
+  errors: string[];
+  config: Partial<MigrationConfig>;
+}
+
 class MigrationService {
-  private config: MigrationConfig;
-  private supabase: any;
+  private supabase: SupabaseClient;
+  private serviceSupabase: SupabaseClient | null = null;
   private migratedItems = 0;
   private errors: string[] = [];
 
-  constructor(config: MigrationConfig) {
-    this.config = config;
+  constructor(private config: MigrationConfig) {
     this.supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+    if (config.supabaseServiceKey) {
+      this.serviceSupabase = createClient(config.supabaseUrl, config.supabaseServiceKey);
+    }
   }
 
   async migrate() {
-    console.log('🚀 Starting AIBOS File System Migration to Supabase...\n');
+    this.logHeader("🚀 AIBOS File System Migration to Supabase");
 
     try {
       await this.checkConnection();
@@ -54,98 +52,88 @@ class MigrationService {
       await this.migrateData();
       await this.verifyMigration();
       await this.generateReport();
-      
-      console.log('\n✅ Migration completed successfully!');
-      console.log(`📊 Migrated ${this.migratedItems} items`);
-      
+
+      this.log(colors.green("\n✅ Migration completed successfully!"));
+      this.log(colors.green(`📊 Migrated ${this.migratedItems} items.`));
+
       if (this.errors.length > 0) {
-        console.log(`⚠️  ${this.errors.length} errors encountered`);
-        this.errors.forEach(error => console.log(`   - ${error}`));
+        this.log(colors.yellow(`⚠️ ${this.errors.length} errors encountered:`));
+        this.errors.forEach(e => this.log(`   - ${e}`));
       }
     } catch (error) {
-      console.error('\n❌ Migration failed:', error);
+      this.log(colors.red(`\n❌ Migration failed: ${error instanceof Error ? error.message : error}`));
       Deno.exit(1);
     }
   }
 
   private async checkConnection() {
-    console.log('🔍 Checking Supabase connection...');
-    
-    try {
-      const { data, error } = await this.supabase.from('file_system_items').select('count').limit(1);
-      
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-      
-      console.log('✅ Connection successful');
-    } catch (error) {
-      console.error('❌ Connection failed:', error);
-      throw new Error('Failed to connect to Supabase. Please check your credentials.');
+    this.log(colors.yellow("🔍 Checking Supabase connection..."));
+
+    const { error } = await this.supabase
+      .from("file_system_items")
+      .select("id")
+      .limit(1);
+
+    if (error && error.code !== "PGRST116") {
+      throw new Error(`Supabase connection failed: ${error.message}`);
     }
+
+    this.log(colors.green("✅ Connection successful."));
   }
 
   private async createSchema() {
-    console.log('\n📋 Creating database schema...');
-    
-    try {
-      const schemaSQL = await this.readSchemaFile();
-      
-      if (!this.config.supabaseServiceKey) {
-        console.log('⚠️  Service role key not provided. Please run the schema manually.');
-        console.log('📝 Copy the contents of supabase/file-system-schema.sql to your Supabase SQL editor.');
-        return;
-      }
+    this.log(colors.yellow("\n📋 Creating database schema..."));
 
-      const serviceSupabase = createClient(this.config.supabaseUrl, this.config.supabaseServiceKey);
-      
-      // Split SQL into individual statements
-      const statements = schemaSQL
-        .split(';')
-        .map(stmt => stmt.trim())
-        .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
-
-      for (const statement of statements) {
-        if (statement.trim()) {
-          const { error } = await serviceSupabase.rpc('exec_sql', { sql: statement });
-          if (error) {
-            console.warn('⚠️  Statement failed (this might be expected):', error.message);
-          }
-        }
-      }
-      
-      console.log('✅ Schema creation completed');
-    } catch (error) {
-      console.log('⚠️  Schema creation failed. Please run the schema manually in Supabase SQL editor.');
-    }
-  }
-
-  private async migrateData() {
-    console.log('\n📦 Migrating file system data...');
-    
-    const sourceData = await this.loadSourceData();
-    
-    if (!sourceData || Object.keys(sourceData).length === 0) {
-      console.log('ℹ️  No source data found. Starting with empty file system.');
+    if (!this.serviceSupabase) {
+      this.log(colors.yellow("⚠️ Service key not provided. Please run schema manually in Supabase."));
       return;
     }
 
-    console.log(`📁 Found ${Object.keys(sourceData).length} directories to migrate`);
+    const sql = await this.readSchemaFile();
+    if (!sql) {
+      this.log(colors.yellow("⚠️ No schema file found."));
+      return;
+    }
 
-    // Create a test user for migration (in production, you'd use real user IDs)
+    const statements = sql
+      .split(";")
+      .map(s => s.trim())
+      .filter(s => s && !s.startsWith("--"));
+
+    for (const statement of statements) {
+      const { error } = await this.serviceSupabase.rpc("exec_sql", { sql: statement });
+      if (error) {
+        this.log(colors.yellow(`⚠️ Schema statement failed: ${error.message}`));
+      }
+    }
+
+    this.log(colors.green("✅ Schema creation completed."));
+  }
+
+  private async migrateData() {
+    this.log(colors.yellow("\n📦 Migrating file system data..."));
+
+    const sourceData = await this.loadSourceData();
+    if (!sourceData || Object.keys(sourceData).length === 0) {
+      this.log(colors.gray("ℹ️ No source data found. Nothing to migrate."));
+      return;
+    }
+
+    this.log(colors.green(`📁 Found ${Object.keys(sourceData).length} directories.`));
+
     const testUserId = await this.createTestUser();
 
-    for (const [path, items] of Object.entries(sourceData)) {
-      console.log(`📂 Migrating directory: ${path || 'root'}`);
-      
+    for (const [dirPath, items] of Object.entries(sourceData)) {
+      this.log(colors.cyan(`\n📂 Migrating directory: ${dirPath || "root"}`));
+
       for (const item of items) {
         try {
-          await this.migrateItem(item, path, testUserId);
+          await this.migrateItem(item, dirPath, testUserId);
           this.migratedItems++;
         } catch (error) {
-          const errorMsg = `Failed to migrate ${item.name}: ${error}`;
-          this.errors.push(errorMsg);
-          console.error(`❌ ${errorMsg}`);
+          const message = `Failed to migrate ${item.name}: ${error instanceof Error ? error.message : error}`;
+          this.errors.push(message);
+          this.log(colors.red(`❌ ${message}`));
         }
       }
     }
@@ -153,233 +141,205 @@ class MigrationService {
 
   private async migrateItem(item: FileItem, path: string, userId: string) {
     if (this.config.dryRun) {
-      console.log(`  [DRY RUN] Would migrate: ${item.name} (${item.type})`);
+      this.log(colors.gray(`[DRY RUN] Would migrate: ${item.name} (${item.type})`));
       return;
     }
 
-    // Create or get default tenant for migration
     const tenantId = await this.getOrCreateDefaultTenant(userId);
 
-    const itemData = {
+    const data = {
       tenant_id: tenantId,
-      path: path,
+      path,
       name: item.name,
       type: item.type,
       size: item.size || 0,
       content: item.content,
       created_by: userId,
       created_at: item.created,
-      updated_at: item.modified
+      updated_at: item.modified,
     };
 
     const { error } = await this.supabase
-      .from('file_system_items')
-      .insert(itemData);
+      .from("file_system_items")
+      .insert(data);
 
     if (error) {
-      throw new Error(`Database error: ${error.message}`);
+      throw new Error(`Database insert error: ${error.message}`);
     }
 
-    console.log(`  ✅ Migrated: ${item.name} (${item.type})`);
+    this.log(colors.green(`  ✅ Migrated: ${item.name} (${item.type})`));
   }
 
   private async getOrCreateDefaultTenant(userId: string): Promise<string> {
-    // Try to find existing default tenant
-    const { data: existingTenant } = await this.supabase
-      .from('tenants')
-      .select('id')
-      .eq('name', 'Default Migration Tenant')
+    const { data, error } = await this.supabase
+      .from("tenants")
+      .select("id")
+      .eq("name", "Default Migration Tenant")
       .single();
 
-    if (existingTenant) {
-      return existingTenant.id;
-    }
+    if (data) return data.id;
 
-    // Create new default tenant
-    const tenantData = {
-      id: crypto.randomUUID(),
-      name: 'Default Migration Tenant',
-      subscription_tier: 'free',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    const tenantId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    const tenant = {
+      id: tenantId,
+      name: "Default Migration Tenant",
+      subscription_tier: "free",
+      created_at: now,
+      updated_at: now,
     };
 
-    const { data: newTenant, error: tenantError } = await this.supabase
-      .from('tenants')
-      .insert([tenantData])
-      .select()
-      .single();
+    const { error: tenantError } = await this.supabase
+      .from("tenants")
+      .insert(tenant);
 
     if (tenantError) {
       throw new Error(`Failed to create tenant: ${tenantError.message}`);
     }
 
-    // Add user as tenant owner
-    const memberData = {
-      tenant_id: newTenant.id,
+    await this.supabase.from("tenant_members").insert({
+      tenant_id: tenantId,
       user_id: userId,
-      role: 'owner',
-      joined_at: new Date().toISOString()
-    };
+      role: "owner",
+      joined_at: now,
+    });
 
-    const { error: memberError } = await this.supabase
-      .from('tenant_members')
-      .insert([memberData]);
-
-    if (memberError) {
-      console.warn(`⚠️  Failed to add user as tenant member: ${memberError.message}`);
-    }
-
-    return newTenant.id;
+    return tenantId;
   }
 
   private async createTestUser(): Promise<string> {
-    // In a real migration, you'd use actual user IDs
-    // For this demo, we'll create a test user or use a default
-    const testUserId = '00000000-0000-0000-0000-000000000000';
-    
-    try {
-      // Try to create a test user in the auth.users table
-      if (this.config.supabaseServiceKey) {
-        const serviceSupabase = createClient(this.config.supabaseUrl, this.config.supabaseServiceKey);
-        
-        const { data, error } = await serviceSupabase.auth.admin.createUser({
-          email: 'migration@aibos.local',
-          password: 'migration-temp-password-123',
-          email_confirm: true
-        });
-
-        if (!error && data.user) {
-          return data.user.id;
-        }
-      }
-    } catch (error) {
-      console.log('⚠️  Could not create test user, using default ID');
+    if (!this.serviceSupabase) {
+      return "00000000-0000-0000-0000-000000000000";
     }
 
-    return testUserId;
+    try {
+      const { data, error } = await this.serviceSupabase.auth.admin.createUser({
+        email: "migration@aibos.local",
+        password: "temporary-password",
+        email_confirm: true,
+      });
+
+      if (data?.user?.id) {
+        return data.user.id;
+      }
+    } catch (e) {
+      this.log(colors.yellow("⚠️ Could not create test user, using default ID."));
+    }
+
+    return "00000000-0000-0000-0000-000000000000";
   }
 
   private async loadSourceData(): Promise<Record<string, FileItem[]> | null> {
-    console.log('📖 Loading source data...');
-    
+    this.log(colors.yellow("📖 Loading source data..."));
+
     try {
-      // Try to load from the old in-memory file system
-      const sourcePath = this.config.sourceDataPath || 'api/files.ts';
-      const sourceContent = await Deno.readTextFile(sourcePath);
-      
-      // Extract the fileSystem object from the source file
-      const fileSystemMatch = sourceContent.match(/const fileSystem = ({[\s\S]*?});/);
-      
-      if (fileSystemMatch) {
-        const fileSystemStr = fileSystemMatch[1];
-        // Convert the object string to actual object
-        const fileSystem = eval(`(${fileSystemStr})`);
-        return fileSystem;
+      const filePath = this.config.sourceDataPath || "api/files.ts";
+      const content = await Deno.readTextFile(filePath);
+
+      const match = content.match(/const fileSystem = ({[\s\S]*?});/);
+      if (match) {
+        return eval(`(${match[1]})`);
       }
-      
-      console.log('ℹ️  No file system data found in source file');
+
+      this.log(colors.gray("ℹ️ No fileSystem object found in source file."));
       return null;
     } catch (error) {
-      console.log('ℹ️  Could not load source data:', error.message);
+      this.log(colors.gray(`ℹ️ Could not load source data: ${error instanceof Error ? error.message : error}`));
       return null;
     }
   }
 
   private async verifyMigration() {
-    console.log('\n🔍 Verifying migration...');
-    
-    try {
-      const { data, error } = await this.supabase
-        .from('file_system_items')
-        .select('*')
-        .order('created_at', { ascending: true });
+    this.log(colors.yellow("\n🔍 Verifying migration..."));
 
-      if (error) {
-        throw error;
-      }
+    const { data, error } = await this.supabase
+      .from("file_system_items")
+      .select("*")
+      .order("created_at", { ascending: true });
 
-      console.log(`✅ Verification complete: ${data?.length || 0} items found in database`);
-      
-      if (data && data.length > 0) {
-        console.log('📋 Sample migrated items:');
-        data.slice(0, 5).forEach(item => {
-          console.log(`   - ${item.name} (${item.type}) in ${item.path}`);
-        });
-      }
-    } catch (error) {
-      console.error('❌ Verification failed:', error);
+    if (error) {
+      this.log(colors.red(`❌ Verification failed: ${error.message}`));
+      return;
     }
+
+    this.log(colors.green(`✅ Verification complete. Found ${data?.length || 0} items.`));
+    data?.slice(0, 5).forEach(item =>
+      this.log(`   - ${item.name} (${item.type}) in ${item.path}`)
+    );
   }
 
   private async generateReport() {
-    console.log('\n📊 Generating migration report...');
-    
-    const report = {
+    this.log(colors.yellow("\n📊 Generating migration report..."));
+
+    const report: MigrationReport = {
       timestamp: new Date().toISOString(),
       migratedItems: this.migratedItems,
       errors: this.errors,
       config: {
         supabaseUrl: this.config.supabaseUrl,
-        dryRun: this.config.dryRun
-      }
+        dryRun: this.config.dryRun,
+      },
     };
 
-    try {
-      await Deno.writeTextFile('migration-report.json', JSON.stringify(report, null, 2));
-      console.log('✅ Migration report saved: migration-report.json');
-    } catch (error) {
-      console.log('⚠️  Failed to save migration report:', error);
-    }
+    await Deno.writeTextFile(
+      "migration-report.json",
+      JSON.stringify(report, null, 2)
+    );
+
+    this.log(colors.green("✅ Migration report saved as migration-report.json"));
   }
 
   private async readSchemaFile(): Promise<string> {
     try {
-      return await Deno.readTextFile('supabase/file-system-schema.sql');
-    } catch (error) {
-      console.log('⚠️  Schema file not found. Please create supabase/file-system-schema.sql');
-      return '';
+      return await Deno.readTextFile("supabase/file-system-schema.sql");
+    } catch {
+      return "";
     }
+  }
+
+  private log(message: string) {
+    console.log(message);
+  }
+
+  private logHeader(message: string) {
+    console.log(colors.bold(colors.cyan("\n" + "=".repeat(60))));
+    console.log(colors.bold(colors.cyan(message)));
+    console.log(colors.bold(colors.cyan("=".repeat(60))));
   }
 }
 
 // Main execution
 async function main() {
-  console.log('🎯 AIBOS File System Migration to Supabase');
-  console.log('==========================================\n');
-
-  // Parse command line arguments
   const args = Deno.args;
-  const dryRun = args.includes('--dry-run');
-  const sourceDataPath = args.find(arg => arg.startsWith('--source='))?.split('=')[1];
+  const dryRun = args.includes("--dry-run");
+  const sourceDataPath = args.find((a) => a.startsWith("--source="))?.split("=")[1];
 
-  // Get configuration from environment or prompt user
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') || prompt('Enter your Supabase URL:');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || prompt('Enter your Supabase anon key:');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || prompt('Enter your Supabase service role key (optional):');
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || prompt("Enter your Supabase URL:");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || prompt("Enter your Supabase anon key:");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || prompt("Enter your Supabase service role key (optional):");
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('❌ Supabase URL and anon key are required');
+    console.error("❌ Supabase URL and anon key are required.");
     Deno.exit(1);
   }
 
   const config: MigrationConfig = {
-    supabaseUrl: supabaseUrl!,
-    supabaseAnonKey: supabaseAnonKey!,
+    supabaseUrl,
+    supabaseAnonKey,
     supabaseServiceKey: supabaseServiceKey || undefined,
     sourceDataPath,
-    dryRun
+    dryRun,
   };
 
   if (dryRun) {
-    console.log('🧪 DRY RUN MODE - No actual data will be migrated\n');
+    console.log(colors.magenta("\n🧪 DRY RUN MODE - No actual data will be migrated.\n"));
   }
 
   const migration = new MigrationService(config);
   await migration.migrate();
 }
 
-// Run the migration
 if (import.meta.main) {
-  main().catch(console.error);
-} 
+  await main();
+}

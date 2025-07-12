@@ -1,240 +1,181 @@
-# AIBOS Mini - Advanced Hybrid Windows Desktop Environment
+# AIBOS Hybrid Windows Platform
 
-A modern, AI-powered desktop environment built with React, TypeScript, and Deno.
+A modern, multi-tenant operating system platform built with Deno, React, TypeScript, and Supabase.
 
-## 🚀 Features
-
-- **Advanced Window Management**: Minimize, maximize, restore, and focus windows
-- **Smart Search System**: Spotlight search with streaming results and quick access
-- **Performance Monitoring**: Real-time performance tracking and optimization
-- **Modern UI/UX**: Beautiful, responsive design with dark mode support
-- **Extensible Architecture**: Plugin-based system for apps and services
-- **Type Safety**: Full TypeScript coverage with strict type checking
-
-## 🛠️ Tech Stack
-
-- **Frontend**: React 18, TypeScript, Tailwind CSS
-- **Backend**: Deno, TypeScript
-- **State Management**: Zustand
-- **Build Tool**: Turbo (monorepo)
-- **Performance**: Custom monitoring and optimization
-
-## 📦 Installation
+## 🚀 Quick Start
 
 ### Prerequisites
+- [Deno](https://deno.land/) (v1.40+)
+- [Node.js](https://nodejs.org/) (v18+) - for Tailwind CSS
+- [Supabase](https://supabase.com/) account
 
-- Node.js >= 18.0.0
-- npm >= 8.0.0
-- Deno >= 1.40.0
+### Development Setup
 
-### Setup
-
-1. **Clone the repository**
+1. **Clone and navigate to the workspace:**
    ```bash
-   git clone <repository-url>
+   git clone <your-repo-url>
    cd aibos_dino
    ```
 
-2. **Install dependencies**
+2. **Start the development server:**
    ```bash
-   npm install
+   deno task dev
    ```
 
-3. **Start development server**
-   ```bash
-   npm run dev
-   ```
+3. **Open your browser:**
+   Navigate to `http://localhost:8000`
 
-## 🎯 Available Scripts
-
-### Root Level
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run api` - Start API server
-- `npm run lint` - Run linting
-- `npm run type-check` - Type checking
-- `npm run clean` - Clean build artifacts
-- `npm run test` - Run tests
-- `npm run format` - Format code
-
-### AIBOS Hybrid Windows
-- `npm run dev` - Start Deno development server
-- `npm run build` - Build application
-- `npm run api` - Start file API server
-- `npm run lint` - Deno linting
-- `npm run type-check` - TypeScript checking
-- `npm run format` - Code formatting
-- `npm run test` - Run tests
-- `npm run clean` - Clean project
-
-## 🏗️ Project Structure
+## 📁 Project Structure
 
 ```
 aibos_dino/
-├── aibos-hybrid-windows/     # Main application
-│   ├── src/
-│   │   ├── apps/            # Application components
-│   │   ├── components/      # UI components
-│   │   ├── services/        # Business logic
-│   │   ├── store/           # State management
-│   │   ├── types/           # TypeScript types
-│   │   └── utils/           # Utilities
-│   ├── api/                 # Backend API
-│   ├── scripts/             # Build scripts
-│   └── main.ts              # Entry point
-├── .turbo/                  # Turbo cache
-├── node_modules/            # Dependencies
-└── package.json             # Root configuration
+├── aibos-hybrid-windows/          # Main AIBOS application
+│   ├── api/                       # API endpoints
+│   ├── apps/                      # App store applications
+│   ├── docs/                      # Documentation
+│   ├── scripts/                   # Build and utility scripts
+│   ├── src/                       # Source code
+│   │   ├── components/            # React components
+│   │   ├── services/              # Business logic services
+│   │   ├── store/                 # State management
+│   │   ├── types/                 # TypeScript type definitions
+│   │   └── utils/                 # Utility functions
+│   ├── supabase/                  # Database schema and migrations
+│   ├── main.ts                    # Application entry point
+│   └── deno.json                  # Deno configuration
+├── deno.json                      # Workspace configuration
+├── tsconfig.json                  # TypeScript configuration
+├── tailwind.config.js             # Tailwind CSS configuration
+└── README.md                      # This file
 ```
+
+## 🛠️ Available Tasks
+
+### Development
+```bash
+deno task dev          # Start development server with hot reload
+deno task build        # Build for production
+```
+
+### Workspace Management
+```bash
+deno task cleanup      # Clean up legacy files and organize workspace
+deno task validate     # Validate SSOT compliance
+deno task setup        # Setup Supabase database and schema
+```
+
+### Manual Scripts
+```bash
+# Cleanup with different modes
+deno run --allow-read --allow-write --allow-run --allow-env aibos-hybrid-windows/scripts/cleanup-workspace.ts --dry-run --full
+deno run --allow-read --allow-write --allow-run --allow-env aibos-hybrid-windows/scripts/cleanup-workspace.ts --safe
+deno run --allow-read --allow-write --allow-run --allow-env aibos-hybrid-windows/scripts/cleanup-workspace.ts --quick
+
+# Setup Supabase
+deno run --allow-net --allow-read --allow-write --allow-env aibos-hybrid-windows/scripts/setup-supabase.ts
+
+# Validate architecture
+deno run --allow-read aibos-hybrid-windows/scripts/validate-ssot.ts
+```
+
+## 🏗️ Architecture
+
+### Single Source of Truth (SSOT)
+This workspace follows strict SSOT principles:
+- **One canonical script per function**
+- **No duplicate files or configurations**
+- **Centralized schema management**
+- **Clear ownership boundaries**
+
+### Technology Stack
+- **Frontend**: React 18 + TypeScript + Tailwind CSS
+- **Backend**: Deno + Supabase
+- **Database**: PostgreSQL (via Supabase)
+- **Real-time**: Supabase Realtime
+- **Authentication**: Supabase Auth
+- **State Management**: Zustand
+
+### Key Features
+- **Multi-tenant architecture**
+- **App store system**
+- **Real-time collaboration**
+- **Performance optimization**
+- **SSOT compliance validation**
 
 ## 🔧 Configuration
 
-### TypeScript
-- Strict type checking enabled
-- Modern ES2022 target
-- Incremental compilation for performance
-- Comprehensive linting rules
+### Environment Variables
+- `AIBOS_WORKSPACE_ROOT`: Override workspace root path (default: parent of current directory)
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_ANON_KEY`: Your Supabase anonymous key
 
-### Tailwind CSS
-- Custom design system
-- Dark mode support
-- Performance-optimized animations
-- Responsive utilities
+### Workspace Root
+The workspace root is automatically detected as the parent of the current directory when running scripts from `aibos-hybrid-windows/`. You can override this using the `AIBOS_WORKSPACE_ROOT` environment variable.
 
-### Performance Monitoring
-- Real-time memory usage tracking
-- Render time monitoring
-- Automatic threshold warnings
-- Performance trend analysis
+## 📚 Documentation
 
-## 🚀 Performance Optimizations
-
-### Build Optimizations
-- **Turbo**: Fast incremental builds
-- **TypeScript**: Incremental compilation
-- **Deno**: Efficient module loading
-- **Tree Shaking**: Unused code elimination
-
-### Runtime Optimizations
-- **React**: Memoization and lazy loading
-- **Zustand**: Minimal re-renders
-- **Search**: Debounced streaming results
-- **Caching**: Intelligent result caching
-
-### Memory Management
-- **Window Pooling**: Reuse window instances
-- **Component Cleanup**: Proper unmounting
-- **Event Listener Management**: Automatic cleanup
-- **Garbage Collection**: Optimized object lifecycle
-
-## 🎨 UI/UX Features
-
-### Window Management
-- Drag and drop windows
-- Resize handles
-- Minimize/maximize/restore
-- Window focus management
-- Z-index stacking
-
-### Search System
-- Real-time search results
-- Quick access items
-- Keyboard navigation
-- Search history
-- Result categorization
-
-### Theme System
-- Multiple theme variants
-- Dark mode support
-- High contrast mode
-- Custom color schemes
-- Smooth transitions
-
-## 🔍 Development Guidelines
-
-### Code Style
-- Use TypeScript strict mode
-- Follow ESLint rules
-- Prettier formatting
-- Meaningful commit messages
-
-### Performance
-- Monitor performance metrics
-- Optimize render cycles
-- Minimize bundle size
-- Use lazy loading
-
-### Testing
-- Unit tests for utilities
-- Integration tests for services
-- E2E tests for critical paths
-- Performance benchmarks
-
-## 📊 Performance Monitoring
-
-The application includes built-in performance monitoring:
-
-```typescript
-import { performanceMonitor } from './src/utils/performance';
-
-// Get current performance report
-const report = performanceMonitor.getReport();
-
-// Set custom thresholds
-performanceMonitor.setThresholds({
-  memoryWarning: 70,
-  memoryCritical: 90,
-  renderTimeWarning: 16,
-  renderTimeCritical: 33,
-});
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **TypeScript Errors**
-   ```bash
-   npm run type-check
-   ```
-
-2. **Performance Issues**
-   - Check performance monitor
-   - Review memory usage
-   - Analyze render times
-
-3. **Build Failures**
-   ```bash
-   npm run clean
-   npm install
-   npm run build
-   ```
-
-### Debug Mode
-
-Enable debug logging:
-```bash
-DEBUG=aibos:* npm run dev
-```
+See the `aibos-hybrid-windows/docs/` directory for detailed documentation:
+- `ARCHITECTURE_UNIFIED.md` - Complete architecture overview
+- `SUPABASE_INTEGRATION.md` - Supabase setup and usage
+- `PERFORMANCE_OPTIMIZATION_COMPLETE.md` - Performance optimization guide
+- `SHORTCUT_MANAGEMENT.md` - Keyboard shortcuts and navigation
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+1. **Fork the repository**
+2. **Create a feature branch**
+3. **Make your changes**
+4. **Run validation:**
+   ```bash
+   deno task validate
+   ```
+5. **Submit a pull request**
+
+### Development Guidelines
+- Follow SSOT principles
+- Use TypeScript for all new code
+- Write comprehensive documentation
+- Test your changes thoroughly
+- Follow the established naming conventions
+
+## 🔍 Validation
+
+The workspace includes automated validation to ensure SSOT compliance:
+
+```bash
+deno task validate
+```
+
+This checks:
+- No forbidden patterns exist
+- All required files are present
+- Directory structure matches canonical layout
+- No duplicate functionality
+
+## 🚀 Deployment
+
+### Production Build
+```bash
+deno task build
+```
+
+### Environment Setup
+1. Set up Supabase project
+2. Configure environment variables
+3. Run database migrations
+4. Deploy to your hosting platform
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - see LICENSE file for details.
 
 ## 🆘 Support
 
-- **Issues**: GitHub Issues
-- **Documentation**: This README
-- **Performance**: Built-in monitoring tools
+For issues and questions:
+1. Check the documentation in `docs/`
+2. Run `deno task validate` to check for configuration issues
+3. Open an issue on GitHub
 
 ---
 
-**AIBOS Mini** - Building the future of desktop computing 🚀 
+**Built with ❤️ by the AIBOS Team** 

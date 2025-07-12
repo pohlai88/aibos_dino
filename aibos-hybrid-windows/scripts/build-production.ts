@@ -1,17 +1,18 @@
 #!/usr/bin/env -S deno run --allow-all
 
 /**
- * Production Build Script for AIBOS
- * 
- * This script creates an optimized production build by:
- * 1. Removing console.log statements
- * 2. Minifying code
- * 3. Optimizing imports
- * 4. Creating a production-ready bundle
+ * Enterprise Production Builder for AIBOS
+ *
+ * This script performs:
+ * - Console removal
+ * - Code minification
+ * - Static asset copying
+ * - Production-ready build report
  */
 
 import { walk } from "https://deno.land/std@0.208.0/fs/mod.ts";
-import { join, extname } from "https://deno.land/std@0.208.0/path/mod.ts";
+import { join, extname, relative, dirname } from "https://deno.land/std@0.208.0/path/mod.ts";
+import * as colors from "https://deno.land/std@0.208.0/fmt/colors.ts";
 
 interface BuildConfig {
   inputDir: string;
@@ -21,33 +22,48 @@ interface BuildConfig {
   sourceMaps: boolean;
 }
 
+interface BuildStats {
+  filesProcessed: number;
+  logsRemoved: number;
+  totalSize: number;
+  startTime: number;
+  endTime: number;
+}
+
 class ProductionBuilder {
   private config: BuildConfig;
-  private processedFiles = 0;
-  private removedLogs = 0;
+  private stats: BuildStats = {
+    filesProcessed: 0,
+    logsRemoved: 0,
+    totalSize: 0,
+    startTime: 0,
+    endTime: 0,
+  };
+
+  private readonly staticExtensions = [
+    ".html", ".css", ".js", ".json",
+    ".png", ".jpg", ".jpeg", ".gif",
+    ".svg", ".ico", ".woff", ".woff2",
+    ".ttf", ".eot"
+  ];
 
   constructor(config: BuildConfig) {
     this.config = config;
   }
 
   async build(): Promise<void> {
-    console.log('🚀 Starting production build...\n');
-    
+    this.stats.startTime = Date.now();
+
+    console.log(colors.bold(colors.cyan("\n🚀 Starting AIBOS Production Build...")));
+
     try {
-      // Create output directory
       await this.ensureOutputDir();
-      
-      // Process all TypeScript and TSX files
-      await this.processFiles();
-      
-      // Copy static assets
+      await this.processSourceFiles();
       await this.copyStaticAssets();
-      
-      // Generate build report
+      this.stats.endTime = Date.now();
       this.generateBuildReport();
-      
     } catch (error) {
-      console.error('❌ Build failed:', error);
+      console.error(colors.red(`❌ Build failed: ${error.message}`));
       Deno.exit(1);
     }
   }
@@ -55,154 +71,155 @@ class ProductionBuilder {
   private async ensureOutputDir(): Promise<void> {
     try {
       await Deno.mkdir(this.config.outputDir, { recursive: true });
-      console.log(`📁 Created output directory: ${this.config.outputDir}`);
+      console.log(colors.green(`📁 Created output directory: ${this.config.outputDir}`));
     } catch (error) {
       if (error instanceof Deno.errors.AlreadyExists) {
-        console.log(`📁 Output directory exists: ${this.config.outputDir}`);
+        console.log(colors.yellow(`📁 Output directory exists: ${this.config.outputDir}`));
       } else {
         throw error;
       }
     }
   }
 
-  private async processFiles(): Promise<void> {
-    console.log('🔧 Processing TypeScript files...');
-    
+  private async processSourceFiles(): Promise<void> {
+    console.log(colors.yellow("\n🔧 Processing TypeScript and TSX files..."));
+
     for await (const entry of walk(this.config.inputDir, {
-      exts: ['.ts', '.tsx'],
+      exts: [".ts", ".tsx"],
       skip: [/node_modules/, /\.git/, /dist/, /build/, /scripts/]
     })) {
-      try {
+      if (entry.isFile) {
         await this.processFile(entry.path);
-        this.processedFiles++;
-      } catch (error) {
-        console.error(`❌ Failed to process ${entry.path}:`, error);
       }
     }
   }
 
   private async processFile(filePath: string): Promise<void> {
     const content = await Deno.readTextFile(filePath);
-    let processedContent = content;
+    let modified = content;
 
-    // Remove console.log statements in production
+    // Remove console logs
     if (this.config.removeConsoleLogs) {
-      const originalLength = processedContent.length;
-      processedContent = this.removeConsoleLogs(processedContent);
-      const removedLength = originalLength - processedContent.length;
-      if (removedLength > 0) {
-        this.removedLogs++;
-      }
+      const [cleaned, logsRemoved] = this.removeConsoleStatements(modified);
+      modified = cleaned;
+      this.stats.logsRemoved += logsRemoved;
     }
 
-    // Basic minification (remove comments and extra whitespace)
+    // Minify if enabled
     if (this.config.minify) {
-      processedContent = this.minifyCode(processedContent);
+      modified = this.minifyCode(modified);
     }
 
-    // Create output path
-    const relativePath = filePath.replace(this.config.inputDir, '');
+    // Determine output path
+    const relativePath = relative(this.config.inputDir, filePath);
     const outputPath = join(this.config.outputDir, relativePath);
 
-    // Ensure output directory exists
-    const outputDir = outputPath.substring(0, outputPath.lastIndexOf('/'));
-    await Deno.mkdir(outputDir, { recursive: true });
+    // Ensure output subdirectory exists
+    await Deno.mkdir(dirname(outputPath), { recursive: true });
 
-    // Write processed file
-    await Deno.writeTextFile(outputPath, processedContent);
-    
-    console.log(`✅ Processed: ${relativePath}`);
+    await Deno.writeTextFile(outputPath, modified);
+
+    const fileSize = (await Deno.stat(outputPath)).size;
+    this.stats.totalSize += fileSize;
+    this.stats.filesProcessed++;
+
+    console.log(colors.gray(`✅ Processed: ${relativePath}`));
   }
 
-  private removeConsoleLogs(content: string): string {
-    // Remove console.log statements
-    content = content.replace(/console\.log\([^)]*\);?\s*/g, '');
-    
-    // Remove console.warn statements
-    content = content.replace(/console\.warn\([^)]*\);?\s*/g, '');
-    
-    // Remove console.error statements (keep these for production debugging)
-    // content = content.replace(/console\.error\([^)]*\);?\s*/g, '');
-    
-    // Remove console.info statements
-    content = content.replace(/console\.info\([^)]*\);?\s*/g, '');
-    
-    // Remove console.debug statements
-    content = content.replace(/console\.debug\([^)]*\);?\s*/g, '');
-    
-    return content;
+  private removeConsoleStatements(content: string): [string, number] {
+    let logsRemoved = 0;
+    const original = content;
+
+    const patterns = [
+      /console\.log\([^;]*\);?/g,
+      /console\.info\([^;]*\);?/g,
+      /console\.warn\([^;]*\);?/g,
+      /console\.debug\([^;]*\);?/g,
+      // Uncomment if you wish to remove errors in production:
+      // /console\.error\([^;]*\);?/g,
+    ];
+
+    patterns.forEach((pattern) => {
+      content = content.replace(pattern, () => {
+        logsRemoved++;
+        return "";
+      });
+    });
+
+    return [content, logsRemoved];
   }
 
   private minifyCode(content: string): string {
-    // Remove single-line comments (but keep JSX comments)
-    content = content.replace(/\/\/.*$/gm, '');
-    
-    // Remove multi-line comments (but keep JSX comments)
-    content = content.replace(/\/\*[\s\S]*?\*\//g, '');
-    
-    // Remove extra whitespace and newlines
-    content = content.replace(/\s+/g, ' ');
-    
-    // Remove trailing whitespace
-    content = content.replace(/\s+$/gm, '');
-    
-    return content.trim();
+    return content
+      // Remove single-line comments (avoid removing JSX comments)
+      .replace(/\/\/.*$/gm, "")
+      // Remove multi-line comments
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      // Remove extra spaces
+      .replace(/\s+/g, " ")
+      // Trim trailing whitespace
+      .trim();
   }
 
   private async copyStaticAssets(): Promise<void> {
-    console.log('\n📁 Copying static assets...');
-    
-    const staticExtensions = ['.html', '.css', '.js', '.json', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'];
-    
+    console.log(colors.yellow("\n📁 Copying static assets..."));
+
     for await (const entry of walk(this.config.inputDir, {
-      skip: [/node_modules/, /\.git/, /dist/, /build/, /scripts/, /\.ts$/, /\.tsx$/]
+      skip: [/node_modules/, /\.git/, /dist/, /build/, /scripts/]
     })) {
-      const ext = extname(entry.path);
-      if (staticExtensions.includes(ext) || entry.isDirectory) {
-        try {
-          const relativePath = entry.path.replace(this.config.inputDir, '');
-          const outputPath = join(this.config.outputDir, relativePath);
-          
-          if (entry.isDirectory) {
-            await Deno.mkdir(outputPath, { recursive: true });
-          } else {
-            const outputDir = outputPath.substring(0, outputPath.lastIndexOf('/'));
-            await Deno.mkdir(outputDir, { recursive: true });
-            await Deno.copyFile(entry.path, outputPath);
-          }
-          
-          console.log(`📄 Copied: ${relativePath}`);
-        } catch (error) {
-          console.error(`❌ Failed to copy ${entry.path}:`, error);
-        }
+      if (entry.isFile && this.isStaticAsset(entry.path)) {
+        const relativePath = relative(this.config.inputDir, entry.path);
+        const outputPath = join(this.config.outputDir, relativePath);
+
+        await Deno.mkdir(dirname(outputPath), { recursive: true });
+        await Deno.copyFile(entry.path, outputPath);
+
+        const fileSize = (await Deno.stat(outputPath)).size;
+        this.stats.totalSize += fileSize;
+
+        console.log(colors.gray(`📄 Copied: ${relativePath}`));
       }
     }
   }
 
+  private isStaticAsset(filePath: string): boolean {
+    return this.staticExtensions.includes(extname(filePath));
+  }
+
   private generateBuildReport(): void {
-    console.log('\n📊 Build Report');
-    console.log('='.repeat(50));
-    console.log(`📁 Files processed: ${this.processedFiles}`);
-    console.log(`🗑️  Console.log statements removed: ${this.removedLogs}`);
-    console.log(`📦 Output directory: ${this.config.outputDir}`);
-    console.log(`⚡ Minification: ${this.config.minify ? 'Enabled' : 'Disabled'}`);
-    console.log(`🗺️  Source maps: ${this.config.sourceMaps ? 'Enabled' : 'Disabled'}`);
-    console.log('='.repeat(50));
-    console.log('🎉 Production build completed successfully!');
+    const duration = (this.stats.endTime - this.stats.startTime) / 1000;
+
+    console.log(colors.cyan("\n📊 BUILD REPORT"));
+    console.log(colors.cyan("=".repeat(50)));
+    console.log(`Files processed: ${this.stats.filesProcessed}`);
+    console.log(`Console logs removed: ${this.stats.logsRemoved}`);
+    console.log(`Total output size: ${this.formatBytes(this.stats.totalSize)}`);
+    console.log(`Minification: ${this.config.minify ? "Enabled" : "Disabled"}`);
+    console.log(`Source maps: ${this.config.sourceMaps ? "Enabled" : "Disabled"}`);
+    console.log(`Duration: ${duration.toFixed(2)}s`);
+    console.log(colors.cyan("=".repeat(50)));
+    console.log(colors.green("🎉 Production build completed successfully!\n"));
+  }
+
+  private formatBytes(bytes: number): string {
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    if (bytes === 0) return "0 Bytes";
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
   }
 }
 
-// Build configuration
+// Load CLI args (basic example)
 const buildConfig: BuildConfig = {
-  inputDir: '.',
-  outputDir: './dist',
+  inputDir: ".",
+  outputDir: "./dist",
   removeConsoleLogs: true,
   minify: true,
-  sourceMaps: false
+  sourceMaps: false,
 };
 
 // Run the build
 if (import.meta.main) {
   const builder = new ProductionBuilder(buildConfig);
   await builder.build();
-} 
+}

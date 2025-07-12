@@ -1,158 +1,192 @@
-#!/usr/bin/env -S deno run --allow-read
+#!/usr/bin/env -S deno run --allow-read --allow-write
 
-import * as path from "https://deno.land/std@0.220.1/path/mod.ts";
+import {
+  walk,
+} from "https://deno.land/std@0.220.1/fs/walk.ts";
+import {
+  globToRegExp,
+} from "https://deno.land/std@0.220.1/path/glob.ts";
+import * as colors from "https://deno.land/std@0.220.1/fmt/colors.ts";
 
-// Load canonical registry
-async function loadCanonicalRegistry(): Promise<any> {
-  try {
-    const registryPath = "workspace-canonical.json";
-    const registryContent = await Deno.readTextFile(registryPath);
-    return JSON.parse(registryContent);
-  } catch (error) {
-    console.error("❌ Failed to load workspace-canonical.json:", error);
-    console.error("Current directory:", Deno.cwd());
-    throw new Error("Canonical registry not found. SSOT validation cannot proceed.");
-  }
+interface ValidationResult {
+  violations: string[];
+  warnings: string[];
+  passed: boolean;
 }
 
-// SSOT Validation Functions
-async function validateSSOT(): Promise<{ violations: string[]; warnings: string[] }> {
-  const registry = await loadCanonicalRegistry();
+/**
+ * Entry point
+ */
+async function main() {
+  console.log(colors.bold(colors.cyan("\n🔍 AIBOS ENTERPRISE SSOT VALIDATION")));
+  console.log(colors.cyan("=".repeat(60)) + "\n");
+
+  const registryPath = parseCliArg("--registry") || "workspace-canonical.json";
+  const jsonReportPath = parseCliArg("--json-report");
+
+  const result = await validateSSOT(registryPath);
+
+  if (result.violations.length > 0) {
+    console.log(colors.red("\n❌ SSOT VIOLATIONS:"));
+    result.violations.forEach(v => console.log(colors.red(`   • ${v}`)));
+  }
+
+  if (result.warnings.length > 0) {
+    console.log(colors.yellow("\n⚠️  SSOT WARNINGS:"));
+    result.warnings.forEach(w => console.log(colors.yellow(`   • ${w}`)));
+  }
+
+  if (result.violations.length === 0 && result.warnings.length === 0) {
+    console.log(colors.green("\n✅ SSOT validation passed - No issues found!"));
+  }
+
+  console.log("\n" + colors.cyan("=".repeat(60)));
+  console.log(
+    result.passed
+      ? colors.green("🎉 SSOT VALIDATION: PASSED")
+      : colors.red("❌ SSOT VALIDATION: FAILED"),
+  );
+  console.log(colors.cyan("=".repeat(60)) + "\n");
+
+  if (jsonReportPath) {
+    await writeJsonReport(jsonReportPath, result);
+  }
+
+  Deno.exit(result.passed ? 0 : 1);
+}
+
+/**
+ * Main validation logic
+ */
+async function validateSSOT(
+  registryPath: string,
+): Promise<ValidationResult> {
   const violations: string[] = [];
   const warnings: string[] = [];
 
-  console.log("🔍 Validating Single Source of Truth...");
+  const registryExists = await fileExists(registryPath);
+  if (!registryExists) {
+    violations.push(`${registryPath} not found`);
+    return { violations, warnings, passed: false };
+  }
 
-  // Check for forbidden files
-  for (const pattern of registry.forbidden.patterns) {
-    const forbiddenFiles = await findFilesByPattern(pattern);
-    for (const file of forbiddenFiles) {
-      violations.push(`Forbidden file found: ${file}`);
+  const registryContent = await Deno.readTextFile(registryPath);
+  const registry = JSON.parse(registryContent);
+  console.log(colors.green("✅ Canonical registry loaded successfully\n"));
+
+  // Check forbidden patterns
+  if (registry.forbidden?.patterns) {
+    for (const pattern of registry.forbidden.patterns) {
+      const files = await findFilesByGlob(pattern);
+      for (const f of files) {
+        violations.push(`Forbidden file matching pattern "${pattern}": ${f}`);
+      }
     }
   }
 
+  // Check for test files
+  const testFiles = await findFilesByGlob("**/test-*.ts");
+  if (testFiles.length > 0) {
+    violations.push(`Test files found: ${testFiles.join(", ")}`);
+  }
+
   // Check for duplicate schema files
-  const schemaFiles = await findFilesByPattern("**/*-schema.sql");
+  const schemaFiles = await findFilesByGlob("**/*schema*.sql");
   if (schemaFiles.length > 1) {
     violations.push(`Multiple schema files found: ${schemaFiles.join(", ")}`);
   }
 
-  // Check for test files in production
-  const testFiles = await findFilesByPattern("**/test-*.ts");
-  if (testFiles.length > 0) {
-    violations.push(`Test files found in production workspace: ${testFiles.join(", ")}`);
-  }
+  // Check build artifacts
+  const buildDirs = [".turbo", "dist", "build", "node_modules"];
+  await Promise.all(
+    buildDirs.map(async (dir) => {
+      const exists = await fileExists(dir);
+      if (exists) {
+        violations.push(`Build artifact found: ${dir}`);
+      }
+    }),
+  );
 
-  // Validate canonical files exist
+  // Validate canonical files
   for (const category of Object.keys(registry)) {
     if (category === "forbidden" || category === "aiAgentBoundaries") continue;
-    
+
     const categoryData = registry[category];
     if (categoryData.files) {
-      for (const file of categoryData.files) {
-        try {
-          await Deno.stat(file);
-        } catch {
-          warnings.push(`Canonical file missing: ${file}`);
-        }
-      }
-    }
-  }
-
-  return { violations, warnings };
-}
-
-async function findFilesByPattern(pattern: string): Promise<string[]> {
-  const files: string[] = [];
-  
-  // Simple pattern matching for common cases
-  if (pattern.includes("test-*.ts")) {
-    for await (const entry of Deno.readDir(".")) {
-      if (entry.isFile && entry.name.startsWith("test-") && entry.name.endsWith(".ts")) {
-        files.push(entry.name);
-      }
-    }
-  }
-  
-  if (pattern.includes("*-schema.sql")) {
-    for await (const entry of Deno.readDir(".")) {
-      if (entry.isFile && entry.name.includes("schema") && entry.name.endsWith(".sql")) {
-        files.push(entry.name);
-      }
-    }
-  }
-
-  // Check subdirectories
-  for await (const entry of Deno.readDir(".")) {
-    if (entry.isDirectory && !entry.name.startsWith(".")) {
-      try {
-        for await (const subEntry of Deno.readDir(entry.name)) {
-          if (subEntry.isFile) {
-            const fullPath = `${entry.name}/${subEntry.name}`;
-            
-            if (pattern.includes("test-*.ts") && subEntry.name.startsWith("test-") && subEntry.name.endsWith(".ts")) {
-              files.push(fullPath);
-            }
-            
-            if (pattern.includes("*-schema.sql") && subEntry.name.includes("schema") && subEntry.name.endsWith(".sql")) {
-              files.push(fullPath);
-            }
+      await Promise.all(
+        categoryData.files.map(async (file: string) => {
+          const exists = await fileExists(file);
+          if (!exists) {
+            warnings.push(`Canonical file missing: ${file}`);
           }
-        }
-      } catch {
-        // Skip directories we can't read
-      }
+        }),
+      );
     }
   }
 
-  return files;
+  return {
+    violations,
+    warnings,
+    passed: violations.length === 0,
+  };
 }
 
-async function main() {
-  console.log('🔍 AI-BOS SSOT Validation Test');
-  console.log('Checking workspace for SSOT compliance...\n');
-
+/**
+ * Check whether a file or directory exists
+ */
+async function fileExists(path: string): Promise<boolean> {
   try {
-    // SSOT Validation
-    console.log('🔍 STEP 1: Single Source of Truth Validation');
-    const { violations, warnings } = await validateSSOT();
-    
-    if (violations.length > 0) {
-      console.log('\n❌ SSOT VIOLATIONS FOUND:');
-      violations.forEach(violation => console.log(`   • ${violation}`));
-    }
-    
-    if (warnings.length > 0) {
-      console.log('\n⚠️ SSOT WARNINGS:');
-      warnings.forEach(warning => console.log(`   • ${warning}`));
-    }
-    
-    if (violations.length === 0 && warnings.length === 0) {
-      console.log('✅ SSOT validation passed');
-    }
-
-    // Overall status
-    const allGood = violations.length === 0;
-    
-    console.log('\n' + '='.repeat(60));
-    if (allGood) {
-      console.log('🎉 AI-BOS SSOT VALIDATION: PASSED ✅');
-      console.log('Your workspace follows SSOT principles!');
-    } else {
-      console.log('❌ AI-BOS SSOT VALIDATION: FAILED');
-      console.log('Please fix the SSOT violations above.');
-    }
-    console.log('='.repeat(60));
-
-    // Exit with appropriate code
-    Deno.exit(allGood ? 0 : 1);
-
-  } catch (error) {
-    console.error('❌ SSOT validation failed with error:', error);
-    Deno.exit(1);
+    await Deno.stat(path);
+    return true;
+  } catch {
+    return false;
   }
 }
 
+/**
+ * Find files matching a glob pattern
+ */
+async function findFilesByGlob(pattern: string): Promise<string[]> {
+  const regex = globToRegExp(pattern);
+  const matches: string[] = [];
+
+  for await (const entry of walk(".", {
+    includeDirs: false,
+    followSymlinks: false,
+  })) {
+    const relativePath = entry.path.replace(Deno.cwd() + "/", "");
+    if (regex.test(relativePath)) {
+      matches.push(relativePath);
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * Parse CLI argument value
+ */
+function parseCliArg(name: string): string | undefined {
+  const arg = Deno.args.find((a) => a.startsWith(name + "="));
+  return arg ? arg.split("=")[1] : undefined;
+}
+
+/**
+ * Write JSON report for CI
+ */
+async function writeJsonReport(path: string, result: ValidationResult) {
+  const output = {
+    timestamp: new Date().toISOString(),
+    violations: result.violations,
+    warnings: result.warnings,
+    passed: result.passed,
+  };
+
+  await Deno.writeTextFile(path, JSON.stringify(output, null, 2));
+  console.log(colors.green(`✅ JSON report saved: ${path}\n`));
+}
+
+// Run script
 if (import.meta.main) {
   await main();
-} 
+}

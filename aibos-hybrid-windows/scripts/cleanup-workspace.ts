@@ -1,29 +1,8 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write --allow-run --allow-env
 
-import * as path from "https://deno.land/std@0.220.1/path/mod.ts";
 import * as colors from "https://deno.land/std@0.220.1/fmt/colors.ts";
-
-/**
- * AIBOS Canonical Workspace Cleanup Script
- * 
- * This is the SINGLE SOURCE OF TRUTH for workspace cleanup.
- * All cleanup functionality is consolidated here with different modes:
- * 
- * USAGE:
- *   deno run --allow-read --allow-write --allow-run --allow-env scripts/cleanup-workspace.ts [OPTIONS]
- * 
- * OPTIONS:
- *   --dry-run     Show what would be cleaned, but don't actually clean
- *   --quick       Only remove fast targets (node_modules, dist, etc.)
- *   --full        Full cleanup including documentation organization (default)
- *   --safe        Safe mode - preserve essential files like tailwind.config.js
- *   --verbose     Show detailed output
- * 
- * EXAMPLES:
- *   deno run scripts/cleanup-workspace.ts --dry-run --full
- *   deno run scripts/cleanup-workspace.ts --quick
- *   deno run scripts/cleanup-workspace.ts --safe --verbose
- */
+import * as path from "https://deno.land/std@0.220.1/path/mod.ts";
+import { globToRegExp } from "https://deno.land/std@0.220.1/path/glob.ts";
 
 interface CleanupResult {
   removedFiles: string[];
@@ -50,490 +29,310 @@ class CanonicalCleanup {
     preservedFiles: [],
     warnings: [],
     errors: [],
-    duration: 0
+    duration: 0,
   };
-  
+
   private dryRun: boolean;
   private verbose: boolean;
   private mode: CleanupMode;
   private workspaceRoot: string;
 
-  constructor() {
-    this.dryRun = Deno.args.includes('--dry-run');
-    this.verbose = Deno.args.includes('--verbose');
-    
-    // Allow override via ENV for flexible deployment scenarios
-    const customRoot = Deno.env.get("AIBOS_WORKSPACE_ROOT");
-    this.workspaceRoot = customRoot || path.dirname(Deno.cwd());
-    
-    this.mode = this.determineMode();
+  constructor(private args: string[]) {
+    this.dryRun = args.includes("--dry-run");
+    this.verbose = args.includes("--verbose");
+    this.workspaceRoot = Deno.env.get("AIBOS_WORKSPACE_ROOT") || path.dirname(Deno.cwd());
+    this.mode = this.determineMode(args);
   }
 
-  private determineMode(): CleanupMode {
-    const args = new Set(Deno.args);
-    
-    if (args.has('--quick')) {
+  private determineMode(args: string[]): CleanupMode {
+    const argsSet = new Set(args);
+    if (argsSet.has("--quick")) {
       return {
-        name: 'Quick Cleanup',
-        description: 'Fast cleanup of build artifacts and node_modules',
-        targets: ['node_modules', 'dist', 'build', '.turbo', 'coverage'],
+        name: "Quick Cleanup",
+        description: "Fast cleanup of build artifacts and node_modules",
+        targets: ["node_modules", "dist", "build", ".turbo", "coverage"],
         preserveEssential: true,
         organizeDocs: false,
-        createStructure: false
+        createStructure: false,
       };
     }
-    
-    if (args.has('--safe')) {
+
+    if (argsSet.has("--safe")) {
       return {
-        name: 'Safe Cleanup',
-        description: 'Cleanup while preserving essential files',
+        name: "Safe Cleanup",
+        description: "Cleanup while preserving essential files",
         targets: [
-          'node_modules', 'dist', 'build', '.turbo', 'coverage',
-          'test-*.ts', 'create-tables.sql', 'setup-database.ts',
-          'aibos-requirement.md', '10min-challenge.md', 'ai-agent-preferences-and-requirements.md',
-          'os-metadata.json', 'config.ts', 'main.ts', 'index.css', 'deno.json', 'deno.lock',
-          'package.json', 'package-lock.json', 'turbo.json'
+          "node_modules", "dist", "build", ".turbo", "coverage",
+          "test-*.ts", "*.lock", "*.json", "*.md", "*.sql", "*.ts", "*.css"
         ],
         preserveEssential: true,
         organizeDocs: true,
-        createStructure: false
+        createStructure: false,
       };
     }
-    
-    // Default: Full cleanup
+
     return {
-      name: 'Full Cleanup',
-      description: 'Complete workspace cleanup and organization',
+      name: "Full Cleanup",
+      description: "Complete workspace cleanup and organization",
       targets: [
-        'node_modules', 'dist', 'build', '.turbo', 'coverage',
-        'test-*.ts', 'create-tables.sql', 'setup-database.ts',
-        'aibos-requirement.md', '10min-challenge.md', 'ai-agent-preferences-and-requirements.md',
-        'os-metadata.json', 'config.ts', 'main.ts', 'index.css', 'deno.json', 'deno.lock',
-        'package.json', 'package-lock.json', 'turbo.json'
+        "node_modules", "dist", "build", ".turbo", "coverage",
+        "test-*.ts", "*.lock", "*.json", "*.md", "*.sql", "*.ts", "*.css"
       ],
       preserveEssential: false,
       organizeDocs: true,
-      createStructure: true
+      createStructure: true,
     };
   }
 
   async run() {
     const start = performance.now();
-    
-    console.log(colors.bold(colors.cyan('🧹 AIBOS Canonical Workspace Cleanup')));
-    console.log(colors.cyan('='.repeat(60)) + '\n');
-    console.log(colors.cyan(`📋 Mode: ${this.mode.name}`));
-    console.log(colors.cyan(`📝 Description: ${this.mode.description}`));
-    console.log(colors.cyan(`📁 Workspace root: ${this.workspaceRoot}`));
-    console.log(colors.cyan(`📁 Current directory: ${Deno.cwd()}\n`));
 
+    this.logHeader("🧹 AIBOS Canonical Workspace Cleanup");
+    this.log(colors.cyan(`Mode: ${this.mode.name}`));
+    this.log(colors.cyan(`Description: ${this.mode.description}`));
+    this.log(colors.cyan(`Workspace root: ${this.workspaceRoot}`));
+    this.log(colors.cyan(`Current directory: ${Deno.cwd()}`));
     if (this.dryRun) {
-      console.log(colors.magenta('\n🧪 DRY-RUN MODE ENABLED - No files will be modified.\n'));
+      this.log(colors.magenta("🧪 DRY-RUN MODE ENABLED - No files will be modified.\n"));
     }
 
-    await this.cleanupRootDirectory();
-    await this.cleanupCurrentDirectory();
-    
+    await this.performCleanup();
+
     if (this.mode.organizeDocs) {
-      await this.organizeDocumentation();
+      await this.organizeDocs();
     }
-    
     if (this.mode.createStructure) {
-      await this.createProductionStructure();
+      await this.createDirs();
     }
-    
+
     await this.updateGitignore();
-    await this.runArchitectureCheck();
-    await this.generateReport();
-    
+    await this.runSSOTCheck();
+
     this.result.duration = (performance.now() - start) / 1000;
+    await this.report();
   }
 
-  private async cleanupRootDirectory() {
-    console.log(colors.yellow(`🔄 Cleaning root directory (${this.mode.name})...`));
-    
-    for (const target of this.mode.targets) {
-      if (target.includes('*')) {
-        // Handle glob patterns
-        await this.handleGlobPattern(target);
-      } else {
-        const targetPath = path.join(this.workspaceRoot, target);
-        await this.safeRemove(targetPath, target === 'node_modules');
-      }
+  private async performCleanup() {
+    for (const pattern of this.mode.targets) {
+      await this.removeByPattern(pattern);
     }
-
-    // Preserve essential files if in safe mode
     if (this.mode.preserveEssential) {
-      const essentialFiles = [
-        'tailwind.config.js'  // Required for AIBOS styling
-      ];
-      
-      for (const file of essentialFiles) {
-        const filePath = path.join(this.workspaceRoot, file);
-        await this.preserveFile(filePath, 'Required for AIBOS operation');
+      await this.preserveEssentialFiles();
+    }
+  }
+
+  private async removeByPattern(pattern: string) {
+    const regex = globToRegExp(pattern, { extended: true, globstar: true });
+    for await (const entry of Deno.readDir(this.workspaceRoot)) {
+      if (regex.test(entry.name)) {
+        const targetPath = path.join(this.workspaceRoot, entry.name);
+        await this.safeRemove(targetPath, entry.isDirectory);
       }
     }
   }
 
-  private async cleanupCurrentDirectory() {
-    console.log(colors.yellow('\n🔄 Cleaning current directory...'));
-    
-    // Remove test files
-    const testFiles = ['test-ssot.ts'];
-    for (const file of testFiles) {
-      await this.safeRemove(file);
-    }
-
-    // Remove duplicate schema files (keep only canonical)
-    for await (const entry of Deno.readDir('.')) {
-      if (entry.isFile && entry.name.includes('schema') && entry.name !== 'aibos-platform-schema.sql') {
-        await this.safeRemove(entry.name);
-      }
-    }
-  }
-
-  private async handleGlobPattern(pattern: string) {
-    if (pattern === 'test-*.ts') {
-      for await (const entry of Deno.readDir(this.workspaceRoot)) {
-        if (entry.isFile && entry.name.startsWith('test-') && entry.name.endsWith('.ts')) {
-          const filePath = path.join(this.workspaceRoot, entry.name);
-          await this.safeRemove(filePath);
-        }
-      }
-    }
-  }
-
-  private async organizeDocumentation() {
-    console.log(colors.yellow('\n📚 Organizing documentation...'));
-    
-    const docsDir = path.join(this.workspaceRoot, 'docs');
+  private async safeRemove(target: string, isDir = false) {
     try {
-      await Deno.mkdir(docsDir);
-      console.log(colors.gray(`   Created directory: ${docsDir}`));
-    } catch (error) {
-      if (error instanceof Deno.errors.AlreadyExists) {
-        if (this.verbose) {
-          console.log(colors.gray(`   Skipped: ${docsDir} (already exists)`));
-        }
+      await Deno.stat(target);
+      if (this.dryRun) {
+        this.log(colors.magenta(`[dry-run] Would remove: ${target}`));
+        return;
+      }
+      await Deno.remove(target, { recursive: isDir });
+      if (isDir) {
+        this.result.removedDirs.push(target);
       } else {
-        throw error;
+        this.result.removedFiles.push(target);
+      }
+      this.log(colors.gray(`Removed: ${target}`));
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) {
+        if (this.verbose) this.log(colors.gray(`Skipped: ${target} (not found)`));
+      } else {
+        this.result.errors.push(`Failed to remove ${target}: ${err}`);
+        this.log(colors.red(`Error removing ${target}: ${err}`));
+      }
+    }
+  }
+
+  private async preserveEssentialFiles() {
+    const essentials = ["tailwind.config.js"];
+    for (const file of essentials) {
+      const fullPath = path.join(this.workspaceRoot, file);
+      try {
+        await Deno.stat(fullPath);
+        this.result.preservedFiles.push(fullPath);
+        this.log(colors.green(`Preserved essential file: ${fullPath}`));
+      } catch {
+        this.log(colors.yellow(`Essential file missing: ${fullPath}`));
+      }
+    }
+  }
+
+  private async organizeDocs() {
+    const docsDir = path.join(this.workspaceRoot, "docs");
+    try {
+      await Deno.mkdir(docsDir, { recursive: true });
+      this.log(colors.gray(`Created directory: ${docsDir}`));
+    } catch (e) {
+      if (e instanceof Deno.errors.AlreadyExists && this.verbose) {
+        this.log(colors.gray(`Skipped creating docs (already exists)`));
       }
     }
 
-    const docsToMove = [
-      { from: path.join(this.workspaceRoot, 'aibos-requirement.md'), to: path.join(docsDir, 'aibos-requirements.md') },
-      { from: path.join(this.workspaceRoot, '10min-challenge.md'), to: path.join(docsDir, '10min-challenge.md') },
-      { from: path.join(this.workspaceRoot, 'ai-agent-preferences-and-requirements.md'), to: path.join(docsDir, 'ai-agent-requirements.md') },
-      { from: 'SUPABASE_INTEGRATION.md', to: path.join(docsDir, 'supabase-integration.md') },
-      { from: 'SUPABASE_SUMMARY.md', to: path.join(docsDir, 'supabase-summary.md') },
-      { from: 'PERFORMANCE_OPTIMIZATION_COMPLETE.md', to: path.join(docsDir, 'performance-optimization.md') },
-      { from: 'OPTIMIZATION_SUMMARY.md', to: path.join(docsDir, 'optimization-summary.md') },
-      { from: 'SPOTLIGHT_ENHANCEMENT_ROADMAP.md', to: path.join(docsDir, 'spotlight-roadmap.md') },
-      { from: 'SHORTCUT_MANAGEMENT.md', to: path.join(docsDir, 'shortcut-management.md') },
-      { from: 'FAVICON_SETUP.md', to: path.join(docsDir, 'favicon-setup.md') }
+    const mappings = [
+      ["aibos-requirement.md", "aibos-requirements.md"],
+      ["10min-challenge.md", "10min-challenge.md"],
     ];
 
-    for (const doc of docsToMove) {
+    for (const [from, to] of mappings) {
+      const fromPath = path.join(this.workspaceRoot, from);
+      const toPath = path.join(docsDir, to);
       try {
-        await Deno.stat(doc.from);
+        await Deno.stat(fromPath);
         if (this.dryRun) {
-          this.result.warnings.push(`[dry-run] Would move: ${doc.from} → ${doc.to}`);
-          console.log(colors.magenta(`   [dry-run] Would move: ${doc.from} → ${doc.to}`));
+          this.log(colors.magenta(`[dry-run] Would move: ${fromPath} → ${toPath}`));
           continue;
         }
-        await Deno.rename(doc.from, doc.to);
-        console.log(colors.gray(`   Moved: ${doc.from} → ${doc.to}`));
-      } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-          console.log(colors.gray(`   Skipped: ${doc.from} (not found)`));
+        await Deno.rename(fromPath, toPath);
+        this.log(colors.gray(`Moved: ${fromPath} → ${toPath}`));
+      } catch (err) {
+        if (err instanceof Deno.errors.NotFound) {
+          this.log(colors.gray(`Skipped moving: ${fromPath} (not found)`));
         } else {
-          this.result.warnings.push(`Warning: Could not move ${doc.from}: ${error}`);
-          console.log(colors.yellow(`   Warning: Could not move ${doc.from}: ${error}`));
+          this.result.warnings.push(`Could not move ${fromPath}: ${err}`);
+          this.log(colors.yellow(`Warning moving ${fromPath}: ${err}`));
         }
       }
     }
   }
 
-  private async createProductionStructure() {
-    console.log(colors.yellow('\n🏗️ Creating production structure...'));
-    
+  private async createDirs() {
     const dirs = [
-      'apps',
-      'docs',
-      'scripts',
-      path.join('src', 'config'),
-      path.join('src', 'services'),
-      path.join('src', 'components'),
-      path.join('src', 'utils')
+      "apps",
+      "docs",
+      "scripts",
+      path.join("src", "config"),
+      path.join("src", "services"),
+      path.join("src", "components"),
+      path.join("src", "utils"),
     ];
-    
+
     for (const dir of dirs) {
       const fullPath = path.join(this.workspaceRoot, dir);
       try {
         await Deno.mkdir(fullPath, { recursive: true });
-        console.log(colors.gray(`   Created directory: ${dir}`));
-      } catch (error) {
-        if (error instanceof Deno.errors.AlreadyExists) {
-          if (this.verbose) {
-            console.log(colors.gray(`   Skipped: ${dir} (already exists)`));
-          }
+        this.log(colors.gray(`Created directory: ${dir}`));
+      } catch (e) {
+        if (e instanceof Deno.errors.AlreadyExists && this.verbose) {
+          this.log(colors.gray(`Skipped creating: ${dir} (already exists)`));
         } else {
-          throw error;
+          this.result.errors.push(`Could not create dir ${dir}: ${e}`);
         }
       }
     }
   }
 
   private async updateGitignore() {
-    console.log(colors.yellow('\n📝 Updating .gitignore...'));
-    
-    const gitignorePath = path.join(this.workspaceRoot, '.gitignore');
-    const gitignoreContent = `# AIBOS Platform - Generated .gitignore
-
-# Dependencies
+    const gitignorePath = path.join(this.workspaceRoot, ".gitignore");
+    const content = `# AIBOS Workspace Generated
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Build outputs
 dist/
 build/
-out/
-.next/
-.nuxt/
-.vuepress/dist/
-
-# Cache directories
 .turbo/
-.cache/
-.parcel-cache/
-.eslintcache
-
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-logs
-*.log
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
 coverage/
-*.lcov
-
-# Deno
+.env*
 deno.lock
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.temp
-
-# AIBOS specific
-supabase/.temp/
-supabase/.env.local
 `;
-
     if (this.dryRun) {
-      this.result.warnings.push(`[dry-run] Would update: ${gitignorePath}`);
-      console.log(colors.magenta(`   [dry-run] Would update: ${gitignorePath}`));
-    } else {
-      try {
-        await Deno.writeTextFile(gitignorePath, gitignoreContent);
-        console.log(colors.gray(`   Updated: ${gitignorePath}`));
-      } catch (error) {
-        this.result.errors.push(`Failed to update .gitignore: ${error}`);
-        console.log(colors.red(`   Error updating .gitignore: ${error}`));
-      }
+      this.log(colors.magenta(`[dry-run] Would write .gitignore`));
+      return;
     }
+    await Deno.writeTextFile(gitignorePath, content);
+    this.log(colors.gray(`Updated .gitignore`));
   }
 
-  private async runArchitectureCheck() {
-    console.log(colors.yellow('\n🔍 Running architecture validation...'));
-    
+  private async runSSOTCheck() {
+    this.log(colors.yellow("\n🔍 Running SSOT validation..."));
     try {
-      const process = new Deno.Command('deno', {
-        args: ['run', '--allow-read', 'scripts/validate-ssot.ts'],
-        cwd: Deno.cwd(),
-        stdout: 'piped',
-        stderr: 'piped'
+      const cmd = new Deno.Command("deno", {
+        args: ["run", "--allow-read", "scripts/validate-ssot.ts"],
+        stdout: "piped",
+        stderr: "piped",
       });
-      
-      const { code, stdout, stderr } = await process.output();
-      
+
+      const { code, stdout, stderr } = await cmd.output();
+
       if (code === 0) {
-        console.log(colors.green('   ✅ Architecture validation passed'));
-        if (this.verbose) {
-          console.log(colors.gray(`   Output: ${new TextDecoder().decode(stdout)}`));
-        }
+        this.log(colors.green("✅ SSOT validation passed."));
       } else {
-        const errorOutput = new TextDecoder().decode(stderr);
-        this.result.warnings.push(`Architecture validation failed: ${errorOutput}`);
-        console.log(colors.yellow(`   ⚠️ Architecture validation failed: ${errorOutput}`));
+        const output = new TextDecoder().decode(stderr);
+        this.result.warnings.push(`SSOT check failed: ${output}`);
+        this.log(colors.yellow(`⚠️ SSOT check failed: ${output}`));
       }
-    } catch (error) {
-      this.result.warnings.push(`Could not run architecture check: ${error}`);
-      console.log(colors.yellow(`   ⚠️ Could not run architecture check: ${error}`));
+    } catch (err) {
+      this.result.errors.push(`Failed to run SSOT check: ${err}`);
+      this.log(colors.red(`Failed to run SSOT check: ${err}`));
     }
   }
 
-  private async safeRemove(filePath: string, isDir = false) {
-    try {
-      await Deno.stat(filePath);
-      if (this.dryRun) {
-        this.result.warnings.push(`[dry-run] Would remove: ${filePath}`);
-        console.log(colors.magenta(`   [dry-run] Would remove: ${filePath}`));
-        return;
-      }
-      await Deno.remove(filePath, isDir ? { recursive: true } : undefined);
-      if (isDir) {
-        this.result.removedDirs.push(filePath);
-      } else {
-        this.result.removedFiles.push(filePath);
-      }
-      console.log(colors.gray(`   Removed: ${filePath}`));
-    } catch (error) {
-      if (error instanceof Deno.errors.NotFound) {
-        console.log(colors.gray(`   Skipped: ${filePath} (not found)`));
-      } else {
-        this.result.errors.push(`Failed to remove ${filePath}: ${error}`);
-        console.log(colors.red(`   Error: ${filePath} - ${error}`));
-      }
-    }
-  }
+  private async report() {
+    console.log("\n" + colors.cyan("=".repeat(60)));
+    console.log(colors.bold("📊 AIBOS CLEANUP REPORT"));
+    console.log(colors.cyan("=".repeat(60)));
 
-  private async preserveFile(filePath: string, reason: string) {
-    try {
-      await Deno.stat(filePath);
-      this.result.preservedFiles.push(`${filePath} (${reason})`);
-      console.log(colors.green(`   Preserved: ${filePath} - ${reason}`));
-    } catch (error) {
-      if (error instanceof Deno.errors.NotFound) {
-        console.log(colors.yellow(`   Warning: ${filePath} not found (expected to preserve)`));
-      }
-    }
-  }
+    console.log(`Duration: ${this.result.duration.toFixed(2)} seconds`);
+    console.log(`Removed Files: ${this.result.removedFiles.length}`);
+    console.log(`Removed Dirs: ${this.result.removedDirs.length}`);
+    console.log(`Preserved Files: ${this.result.preservedFiles.length}`);
+    console.log(`Warnings: ${this.result.warnings.length}`);
+    console.log(`Errors: ${this.result.errors.length}`);
 
-  private async generateReport() {
-    console.log('\n' + colors.cyan('='.repeat(60)));
-    console.log(colors.bold('📊 CANONICAL CLEANUP REPORT'));
-    console.log(colors.cyan('='.repeat(60)));
-
-    console.log(colors.cyan('\n📈 SUMMARY:'));
-    console.log(`   Mode: ${this.mode.name}`);
-    console.log(`   Duration: ${this.result.duration.toFixed(2)} seconds`);
-    console.log(`   Removed Files: ${this.result.removedFiles.length}`);
-    console.log(`   Removed Directories: ${this.result.removedDirs.length}`);
-    console.log(`   Preserved Files: ${this.result.preservedFiles.length}`);
-    console.log(`   Warnings: ${this.result.warnings.length}`);
-    console.log(`   Errors: ${this.result.errors.length}`);
-
-    if (this.result.removedFiles.length > 0) {
-      console.log(`\n🗑️ Removed Files (${this.result.removedFiles.length}):`);
-      this.result.removedFiles.forEach(file => {
-        console.log(`   • ${file}`);
-      });
-    }
-
-    if (this.result.removedDirs.length > 0) {
-      console.log(`\n📁 Removed Directories (${this.result.removedDirs.length}):`);
-      this.result.removedDirs.forEach(dir => {
-        console.log(`   • ${dir}`);
-      });
-    }
-
-    if (this.result.preservedFiles.length > 0) {
-      console.log(`\n🛡️ Preserved Files (${this.result.preservedFiles.length}):`);
-      this.result.preservedFiles.forEach(file => {
-        console.log(`   • ${file}`);
-      });
-    }
-
-    if (this.result.warnings.length > 0) {
-      console.log(`\n⚠️ Warnings (${this.result.warnings.length}):`);
-      this.result.warnings.forEach(w => console.log(`   • ${w}`));
-    }
-
-    if (this.result.errors.length > 0) {
-      console.log(`\n❌ Errors (${this.result.errors.length}):`);
-      this.result.errors.forEach(error => {
-        console.log(`   • ${error}`);
-      });
-    }
-
-    console.log('\n' + colors.cyan('='.repeat(60)));
     if (this.result.errors.length === 0) {
-      console.log(colors.green('🎉 Canonical cleanup completed successfully!'));
-      console.log(colors.green('Your AIBOS workspace is now SSOT-compliant.'));
+      console.log(colors.green("\n🎉 Cleanup completed successfully."));
     } else {
-      console.log(colors.yellow('⚠️ Cleanup completed with some errors.'));
-      console.log(colors.yellow('Please review the errors above.'));
+      console.log(colors.yellow("\n⚠️ Cleanup completed with errors."));
     }
-    console.log(colors.cyan('='.repeat(60)));
+
+    await Deno.writeTextFile(
+      "cleanup-report.json",
+      JSON.stringify(this.result, null, 2)
+    );
+    console.log(colors.gray("Generated report: cleanup-report.json"));
+  }
+
+  private log(message: string) {
+    console.log(message);
+  }
+
+  private logHeader(title: string) {
+    console.log("\n" + colors.bold(colors.cyan("=".repeat(60))));
+    console.log(colors.bold(colors.cyan(title)));
+    console.log(colors.bold(colors.cyan("=".repeat(60))));
   }
 }
 
-// Show help if requested
-if (Deno.args.includes('--help') || Deno.args.includes('-h')) {
-  console.log(colors.bold(colors.cyan('AIBOS Canonical Workspace Cleanup')));
-  console.log(colors.cyan('='.repeat(60)));
-  console.log('\nUsage:');
-  console.log('  deno run --allow-read --allow-write --allow-run --allow-env scripts/cleanup-workspace.ts [OPTIONS]');
-  console.log('\nOptions:');
-  console.log('  --dry-run     Show what would be cleaned, but don\'t actually clean');
-  console.log('  --quick       Only remove fast targets (node_modules, dist, etc.)');
-  console.log('  --full        Full cleanup including documentation organization (default)');
-  console.log('  --safe        Safe mode - preserve essential files like tailwind.config.js');
-  console.log('  --verbose     Show detailed output');
-  console.log('  --help, -h    Show this help message');
-  console.log('\nEnvironment Variables:');
-  console.log('  AIBOS_WORKSPACE_ROOT  Override workspace root path (default: parent of current directory)');
-  console.log('\nWorkspace Root:');
-  console.log('  By default, the workspace root is assumed to be the parent of the current directory.');
-  console.log('  This works for the typical AIBOS structure where you run the script from aibos-hybrid-windows/.');
-  console.log('  Use AIBOS_WORKSPACE_ROOT environment variable to override this behavior.');
-  console.log('\nExamples:');
-  console.log('  # Run from aibos-hybrid-windows/ directory (default behavior)');
-  console.log('  cd aibos-hybrid-windows');
-  console.log('  deno run scripts/cleanup-workspace.ts --dry-run --full');
-  console.log('\n  # Run from project root with explicit workspace root');
-  console.log('  cd /my-project-root');
-  console.log('  AIBOS_WORKSPACE_ROOT=/my-project-root deno run aibos-hybrid-windows/scripts/cleanup-workspace.ts --quick');
-  console.log('\n  # Safe cleanup preserving essential files');
-  console.log('  deno run scripts/cleanup-workspace.ts --safe --verbose');
+if (Deno.args.includes("--help") || Deno.args.includes("-h")) {
+  console.log(`
+Usage:
+  deno run --allow-read --allow-write --allow-run --allow-env scripts/cleanup-workspace.ts [OPTIONS]
+
+Options:
+  --dry-run     Show actions without modifying files
+  --quick       Fast cleanup
+  --safe        Preserve essential files
+  --full        Complete cleanup (default)
+  --verbose     Show detailed logs
+  --help, -h    Show help
+
+Examples:
+  deno run scripts/cleanup-workspace.ts --dry-run --safe
+  deno run scripts/cleanup-workspace.ts --quick
+`);
   Deno.exit(0);
 }
 
-// Run cleanup
 if (import.meta.main) {
-  const cleanup = new CanonicalCleanup();
+  const cleanup = new CanonicalCleanup(Deno.args);
   await cleanup.run();
-} 
+}
