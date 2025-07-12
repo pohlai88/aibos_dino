@@ -15,15 +15,26 @@ export interface SearchProvider {
   id: string;
   name: string;
   description?: string;
-  search: (query: string) => Promise<SearchResult[]>;
+  search: (query: string, limit?: number) => Promise<SearchResult[]>;
   priority?: number; // Provider priority for result ordering
+  getQuickAccess?: (limit?: number) => Promise<SearchResult[]>; // Optional quick access items
 }
 
 export interface SearchRegistry {
   providers: Map<string, SearchProvider>;
   register(provider: SearchProvider): void;
   unregister(id: string): void;
-  search(query: string): Promise<SearchResult[]>;
+  search(query: string, limit?: number): Promise<SearchResult[]>;
+  /**
+   * Streams results as they arrive from each provider.
+   * onResult is called with each provider's results as soon as they are available.
+   */
+  searchStream(query: string, onResult: (partialResults: SearchResult[]) => void, limit?: number): Promise<SearchResult[]>;
+  /**
+   * Gets quick access items for when search is empty.
+   * Returns frequently used or important items.
+   */
+  getQuickAccess(limit?: number): Promise<SearchResult[]>;
 }
 
 // Search result types for better categorization

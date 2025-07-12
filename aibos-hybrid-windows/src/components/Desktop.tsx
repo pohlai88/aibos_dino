@@ -1,65 +1,75 @@
-import React, { memo, useEffect } from 'react';
-import { Dock } from './Dock.tsx';
-import { TopBar } from './TopBar.tsx';
-import { StartMenu } from './StartMenu.tsx';
-import { Window } from './Window.tsx';
-import { Spotlight } from './Spotlight.tsx';
-import { ShortcutHelp } from './ShortcutHelp.tsx';
+import React, { useState, useEffect, memo } from 'react';
 import { useUIState } from '../store/uiState.ts';
-import { useGlobalShortcuts } from './useGlobalShortcuts.tsx';
 import { appRegistry } from '../services/appRegistry.ts';
 import { searchRegistry } from '../services/searchRegistry.ts';
 import { systemCommands } from '../services/systemCommands.ts';
+import { shortcutManager } from '../services/shortcutManager.ts';
+import { Window } from './Window.tsx';
+import { Spotlight } from './Spotlight.tsx';
+import { ShortcutHelp } from './ShortcutHelp.tsx';
+import { StartMenu } from './StartMenu.tsx';
+import { Dock } from './Dock.tsx';
+import { TopBar } from './TopBar.tsx';
 import { Notepad } from '../apps/Notepad.tsx';
-import { Calculator } from '../apps/Calculator.tsx';
 import { Files } from '../apps/Files.tsx';
+import { Calculator } from '../apps/Calculator.tsx';
 import { ThemeSelector } from './ThemeSelector.tsx';
+import type { AppInfo } from '../services/appRegistry.ts';
 
-// Media query types for Deno environment
-interface MediaQueryList {
-  matches: boolean;
-  addEventListener(type: string, listener: (e: MediaQueryListEvent) => void): void;
-  removeEventListener(type: string, listener: (e: MediaQueryListEvent) => void): void;
-}
-
-interface MediaQueryListEvent {
-  matches: boolean;
-}
-
-interface WindowWithMediaQuery extends Window {
-  matchMedia(query: string): MediaQueryList;
+// Type definitions for window objects
+interface OpenWindow {
+  id: string;
+  component: string;
+  props?: Record<string, unknown>;
+  zIndex: number;
 }
 
 // Initialize apps
 const initializeApps = () => {
-  appRegistry.register({
-    id: 'notepad',
-    title: 'Notepad',
-    icon: '📝',
-    description: 'Take notes and edit text files',
-    category: 'Productivity',
-    permissions: ['filesystem'],
-    component: Notepad,
-  });
+  const apps: Omit<AppInfo, 'status' | 'metadata'>[] = [
+    {
+      id: 'notepad',
+      title: 'Notepad',
+      icon: '📝',
+      description: 'Take notes and edit text files',
+      category: 'productivity',
+      permissions: ['file-system'],
+      component: Notepad,
+    },
+    {
+      id: 'files',
+      title: 'Program Files',
+      icon: '📁',
+      description: 'Browse and manage installed programs',
+      category: 'system',
+      permissions: ['file-system'],
+      component: Files,
+    },
+    {
+      id: 'calculator',
+      title: 'Calculator',
+      icon: '🧮',
+      description: 'Perform calculations and conversions',
+      category: 'utilities',
+      permissions: [],
+      component: Calculator,
+    },
+  ];
 
-  appRegistry.register({
-    id: 'calculator',
-    title: 'Calculator',
-    icon: '🧮',
-    description: 'Perform calculations',
-    category: 'Utilities',
-    permissions: [],
-    component: Calculator,
-  });
-
-  appRegistry.register({
-    id: 'files',
-    title: 'Files',
-    icon: '📁',
-    description: 'Browse and manage files',
-    category: 'System',
-    permissions: ['filesystem'],
-    component: Files,
+  apps.forEach(app => {
+    appRegistry.register({
+      ...app,
+      status: 'inactive',
+      metadata: {
+        version: '1.0.0',
+        author: 'AIBOS Team',
+        tags: [],
+        lastUpdated: new Date(),
+        installDate: new Date(),
+        usageCount: 0
+      },
+      permissions: [...app.permissions]
+    });
   });
 
   appRegistry.register({
@@ -67,9 +77,18 @@ const initializeApps = () => {
     title: 'Theme Selector',
     icon: '🎨',
     description: 'Choose from beautiful themes',
-    category: 'Appearance',
+    category: 'utilities',
     permissions: [],
     component: ThemeSelector,
+    status: 'inactive',
+    metadata: {
+      version: '1.0.0',
+      author: 'AIBOS Team',
+      tags: [],
+      lastUpdated: new Date(),
+      installDate: new Date(),
+      usageCount: 0
+    }
   });
 };
 
@@ -101,7 +120,7 @@ const WindowsContainer: React.FC = memo(() => {
 
   return (
     <div className="absolute inset-0">
-      {openWindows.map((win) => {
+      {openWindows.map((win: OpenWindow) => {
         const appInfo = appRegistry.get(win.component);
         if (!appInfo) return null;
 
@@ -127,8 +146,8 @@ const WindowsContainer: React.FC = memo(() => {
 const BackgroundSystem: React.FC = memo(() => {
   const { theme } = useUIState();
 
-  // Dynamic background classes based on theme
-  const getBackgroundClass = () => {
+  // Memoize background class to prevent unnecessary recalculations
+  const backgroundClass = React.useMemo(() => {
     switch (theme) {
       case 'nebula':
         return 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900';
@@ -153,29 +172,107 @@ const BackgroundSystem: React.FC = memo(() => {
       default:
         return 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900';
     }
-  };
+  }, [theme]);
+
+  // Memoize floating particles to prevent recreation on every render
+  const floatingParticles = React.useMemo(() => 
+    [...Array(20)].map((_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      delay: `${Math.random() * 5}s`,
+      duration: `${3 + Math.random() * 4}s`,
+    })), []
+  );
 
   return (
-    <div className={`absolute inset-0 ${getBackgroundClass()} transition-all duration-1000`}>
+    <div className={`absolute inset-0 ${backgroundClass} transition-all duration-1000`}>
       {/* Glass blobs with theme-aware colors */}
       <div className="absolute w-96 h-96 bg-purple-600/20 rounded-full blur-3xl top-1/3 left-1/4 animate-pulse" />
       <div className="absolute w-64 h-64 bg-blue-600/15 rounded-full blur-2xl bottom-1/4 right-1/3 animate-pulse delay-1000" />
       <div className="absolute w-80 h-80 bg-indigo-600/10 rounded-full blur-2xl top-1/4 right-1/4 animate-pulse delay-500" />
+      
+      {/* Enhanced floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {floatingParticles.map((particle) => (
+          <div
+            key={particle.id}
+            className="absolute w-1 h-1 bg-white/20 rounded-full animate-float"
+            style={{
+              left: particle.left,
+              top: particle.top,
+              animationDelay: particle.delay,
+              animationDuration: particle.duration,
+            }}
+          />
+        ))}
+      </div>
+      
+      {/* Subtle grid pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="w-full h-full" style={{
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px'
+        }} />
+      </div>
     </div>
   );
 });
 
 export const Desktop: React.FC = memo(() => {
   const { spotlightVisible, shortcutHelpVisible, closeShortcutHelp } = useUIState();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Initialize global shortcuts
-  useGlobalShortcuts();
+  shortcutManager.initialize();
 
   // Initialize apps and search providers on mount
   useEffect(() => {
-    initializeApps();
-    initializeSearchProviders();
+    try {
+      initializeApps();
+      initializeSearchProviders();
+      setIsInitialized(true);
+    } catch (err) {
+      console.error('Failed to initialize desktop:', err);
+      setError(err instanceof Error ? err.message : 'Initialization failed');
+    }
   }, []);
+
+  // Show loading state while initializing
+  if (!isInitialized) {
+    return (
+      <div className="w-screen h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="text-4xl mb-4">🚀</div>
+          <div className="text-xl font-semibold mb-2">Loading AIBOS</div>
+          <div className="text-sm opacity-75">Initializing desktop environment...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if initialization failed
+  if (error) {
+    return (
+      <div className="w-screen h-screen bg-gradient-to-br from-red-900 via-red-800 to-red-700 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <div className="text-xl font-semibold mb-2">Initialization Error</div>
+          <div className="text-sm opacity-75 mb-4">{error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-white bg-opacity-20 rounded hover:bg-opacity-30 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`w-screen h-screen relative overflow-hidden transition-colors duration-500`}>

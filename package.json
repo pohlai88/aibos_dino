@@ -1,0 +1,31 @@
+{
+  "name": "aibos-mini",
+  "version": "1.0.0",
+  "description": "AIBOS Mini - Advanced Hybrid Windows Desktop Environment",
+  "private": true,
+  "keywords": ["desktop", "os", "hybrid", "windows", "react", "deno"],
+  "author": "AIBOS Team",
+  "license": "MIT",
+  "workspaces": [
+    "aibos-hybrid-windows"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "api": "turbo run api",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean",
+    "start": "turbo run dev",
+    "test": "turbo run test",
+    "format": "turbo run format"
+  },
+  "devDependencies": {
+    "turbo": "^1.12.0"
+  },
+  "packageManager": "npm@10.8.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}

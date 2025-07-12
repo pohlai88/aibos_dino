@@ -1,48 +1,94 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { memo, useState, useEffect, useRef, useMemo } from 'react';
 import { useUIState } from '../store/uiState.ts';
 import { searchRegistry } from '../services/searchRegistry.ts';
-import { SearchResult } from '../types/search.ts';
+// Simple debounce utility for Deno compatibility
+function debounce<T extends (...args: any[]) => void>(fn: T, wait: number) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  const debounced = (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => fn(...args), wait);
+  };
+  debounced.cancel = () => {
+    if (timeout) clearTimeout(timeout);
+    timeout = null;
+  };
+  return debounced as T & { cancel: () => void };
+}
 
-export const Spotlight: React.FC = () => {
-  const { toggleSpotlight } = useUIState();
+interface SearchResult {
+  id: string;
+  title: string;
+  description?: string;
+  icon: string;
+  type: 'app' | 'command' | 'file' | 'setting';
+  action: () => void;
+  tags?: string[];
+  category?: string;
+}
+
+export const Spotlight = memo(() => {
+  const { spotlightVisible, closeSpotlight } = useUIState();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<any[]>([]);
+  const [quickAccess, setQuickAccess] = useState<any[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
+  const resultLimit = 10;
 
-  // Debounced search
-  const debouncedSearch = useCallback(
-    debounce(async (searchQuery: string) => {
-      if (!searchQuery.trim()) {
-        setResults([]);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const searchResults = await searchRegistry.search(searchQuery);
-        setResults(searchResults);
-        setSelectedIndex(0);
-      } catch (error) {
-        console.error('Search failed:', error);
-        setResults([]);
-      } finally {
-        setIsLoading(false);
-      }
-    }, 150),
-    []
-  );
-
+  // Focus input when spotlight opens
   useEffect(() => {
+    if (spotlightVisible) {
+      setQuery('');
+      setSelectedIndex(0);
+      setResults([]);
+      // Load quick access items
+      searchRegistry.getQuickAccess(8).then(items => {
+        setQuickAccess(items);
+      });
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [spotlightVisible]);
+
+  // Debounced search handler
+  const debouncedSearch = useMemo(() => debounce((q: string) => {
+    setIsLoading(true);
+    setResults([]);
+    let allResults: any[] = [];
+    searchRegistry.searchStream(q, (partial) => {
+      allResults = [...allResults, ...partial];
+      // Remove duplicates by id
+      const unique = Array.from(new Map(allResults.map(r => [r.id, r])).values());
+      setResults(unique.slice(0, resultLimit));
+    }, resultLimit).then(finalResults => {
+      setIsLoading(false);
+      setResults(finalResults.slice(0, resultLimit));
+      setSelectedIndex(0);
+    });
+  }, 200), []);
+
+  // Search functionality
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setIsLoading(false);
+      return;
+    }
     debouncedSearch(query);
+    return () => {
+      debouncedSearch.cancel();
+    };
   }, [query, debouncedSearch]);
 
-  // Handle keyboard navigation
+  // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
+      case 'Escape':
+        e.preventDefault();
+        closeSpotlight();
+        break;
       case 'ArrowDown':
         e.preventDefault();
         setSelectedIndex(prev => 
@@ -58,194 +104,172 @@ export const Spotlight: React.FC = () => {
       case 'Enter':
         e.preventDefault();
         if (results[selectedIndex]) {
-          executeResult(results[selectedIndex]);
+          results[selectedIndex].action();
         }
         break;
-      case 'Escape':
+      case 'Tab':
         e.preventDefault();
-        toggleSpotlight();
+        // Cycle through results
+        setSelectedIndex(prev => 
+          prev < results.length - 1 ? prev + 1 : 0
+        );
         break;
     }
   };
 
-  const executeResult = async (result: SearchResult) => {
-    try {
-      await result.action();
-      toggleSpotlight();
-      setQuery('');
-      setResults([]);
-    } catch (error) {
-      console.error('Failed to execute result:', error);
-    }
+  // Handle result selection
+  const handleResultClick = (result: SearchResult) => {
+    result.action();
   };
 
-  const handleResultClick = (result: SearchResult, index: number) => {
-    setSelectedIndex(index);
-    executeResult(result);
-  };
-
-  // Auto-focus input when component mounts
-  useEffect(() => {
-    if (inputRef.current) {
-      (inputRef.current as any).focus();
-    }
-  }, []);
-
-  // Scroll selected item into view
-  useEffect(() => {
-    if (resultsRef.current && selectedIndex >= 0) {
-      const selectedElement = (resultsRef.current as any).children[selectedIndex] as HTMLElement;
-      if (selectedElement) {
-        (selectedElement as any).scrollIntoView({ 
-          block: 'nearest',
-          behavior: 'smooth'
-        });
-      }
-    }
-  }, [selectedIndex]);
-
-  const getResultIcon = (result: SearchResult) => {
-    if (result.icon) return result.icon;
-    
-    switch (result.type) {
-      case 'app': return '📱';
-      case 'command': return '⚡';
-      case 'file': return '📄';
-      case 'system': return '⚙️';
-      default: return '🔍';
-    }
-  };
-
-  const getResultCategory = (result: SearchResult) => {
-    if (result.category) return result.category;
-    
-    switch (result.type) {
-      case 'app': return 'Application';
-      case 'command': return 'Command';
-      case 'file': return 'File';
-      case 'system': return 'System';
-      default: return 'Other';
-    }
-  };
+  if (!spotlightVisible) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        key="spotlight-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-[9999]"
-        onClick={toggleSpotlight}
-      >
-        <motion.div
-          key="spotlight-panel"
-          initial={{ y: -50, opacity: 0, scale: 0.95 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: -50, opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Search Input */}
-          <div className="p-4 border-b border-gray-700">
-            <div className="flex items-center space-x-3">
-              <span className="text-gray-400 text-xl">🔍</span>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700">
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl">🔍</span>
+            <div className="flex-1">
               <input
                 ref={inputRef}
                 type="text"
-                className="flex-1 bg-transparent text-white placeholder-gray-400 text-lg outline-none"
-                placeholder="Search apps, commands, files..."
+                placeholder="Search apps, commands, shortcuts, and settings..."
                 value={query}
-                                 onChange={(e) => setQuery((e.target as any).value)}
+                onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
+                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
               />
-              {isLoading && (
-                <div className="w-5 h-5 border-2 border-gray-400 border-t-white rounded-full animate-spin" />
+            </div>
+            <button
+              onClick={closeSpotlight}
+              className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              aria-label="Close spotlight"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Results */}
+        <div className="max-h-96 overflow-y-auto">
+          {isLoading ? (
+            <div className="p-8 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">Searching...</p>
+            </div>
+          ) : results.length > 0 ? (
+            <div className="p-2">
+              {results.map((result, index) => (
+                <button
+                  key={result.id}
+                  type="button"
+                  className={`w-full text-left p-4 rounded-lg transition-all duration-200 flex items-center space-x-3 ${
+                    index === selectedIndex
+                      ? 'bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                  onClick={() => handleResultClick(result)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                >
+                  <span className="text-2xl flex-shrink-0">{result.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                      {result.title}
+                    </div>
+                    {result.description && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {result.description}
+                      </div>
+                    )}
+                    {result.category && (
+                      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {result.category}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-shrink-0">
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      result.type === 'app' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      result.type === 'command' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                      result.type === 'file' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
+                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                    }`}>
+                      {result.type}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : query.trim() ? (
+            <div className="p-8 text-center">
+              <span className="text-4xl mb-4 block">🔍</span>
+              <p className="text-gray-600 dark:text-gray-400 mb-2">
+                No results found for "{query}"
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-500">
+                Try different keywords or check your spelling
+              </p>
+            </div>
+          ) : (
+            <div className="p-6">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+                Quick Access
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {quickAccess.length > 0 ? (
+                  quickAccess.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="w-full text-left p-3 rounded-lg transition-all duration-200 flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => item.action()}
+                    >
+                      <span className="text-xl flex-shrink-0">{item.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                          {item.title}
+                        </div>
+                        {item.description && (
+                          <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                            {item.description}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="col-span-2 text-center py-4">
+                    <span className="text-2xl mb-2 block">🚀</span>
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Start typing to search apps, commands, and more
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+          <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center space-x-4">
+              <span>↑↓ Navigate</span>
+              <span>Enter Select</span>
+              <span>Esc Close</span>
+            </div>
+            <div>
+              {results.length > 0 && (
+                <span>{results.length} result{results.length !== 1 ? 's' : ''}</span>
               )}
             </div>
           </div>
-
-          {/* Results */}
-          <div className="max-h-96 overflow-y-auto" ref={resultsRef}>
-            {results.length > 0 ? (
-              <div className="py-2">
-                {results.map((result, index) => (
-                  <motion.div
-                    key={result.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`flex items-center p-3 cursor-pointer transition-colors ${
-                      index === selectedIndex
-                        ? 'bg-blue-600 text-white'
-                        : 'hover:bg-gray-800 text-gray-200'
-                    }`}
-                    onClick={() => handleResultClick(result, index)}
-                  >
-                    <span className="text-2xl mr-3">{getResultIcon(result)}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{result.title}</div>
-                      {result.description && (
-                        <div className={`text-sm truncate ${
-                          index === selectedIndex ? 'text-blue-100' : 'text-gray-400'
-                        }`}>
-                          {result.description}
-                        </div>
-                      )}
-                    </div>
-                    <div className={`text-xs px-2 py-1 rounded ${
-                      index === selectedIndex 
-                        ? 'bg-blue-700 text-blue-100' 
-                        : 'bg-gray-700 text-gray-400'
-                    }`}>
-                      {getResultCategory(result)}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : query && !isLoading ? (
-              <div className="p-8 text-center text-gray-400">
-                <div className="text-4xl mb-2">🔍</div>
-                <div className="text-lg">No results found</div>
-                <div className="text-sm">Try a different search term</div>
-              </div>
-            ) : !query ? (
-              <div className="p-8 text-center text-gray-400">
-                <div className="text-4xl mb-2">🚀</div>
-                <div className="text-lg">Start typing to search</div>
-                <div className="text-sm">Apps, commands, files, and more</div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Footer */}
-          <div className="p-3 border-t border-gray-700 bg-gray-800">
-            <div className="flex items-center justify-between text-xs text-gray-400">
-              <div className="flex items-center space-x-4">
-                <span>↑↓ Navigate</span>
-                <span>Enter Select</span>
-                <span>Esc Close</span>
-              </div>
-              <span>{results.length} result{results.length !== 1 ? 's' : ''}</span>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </div>
   );
-};
-
-// Debounce utility function
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: number;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = (setTimeout as any)(() => func(...args), wait);
-  };
-}
+});
 
 Spotlight.displayName = 'Spotlight';

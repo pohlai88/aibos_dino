@@ -1,27 +1,14 @@
 {
   "name": "aibos-hybrid-windows",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "AIBOS Hybrid Windows Platform",
+  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "deno run --allow-all --watch main.ts",
+    "build": "deno run --allow-all main.ts",
+    "clean": "deno run --allow-read --allow-write --allow-run scripts/quick-clean.ts"
   },
-  "dependencies": {
-    "framer-motion": "^12.23.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-rnd": "^10.5.2",
-    "zustand": "^4.4.7"
-  },
-  "devDependencies": {
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.0.3",
-    "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.21",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.2.2",
-    "vite": "^4.4.9"
-  }
-}
+  "keywords": ["aibos", "deno", "react", "supabase"],
+  "author": "AIBOS Team",
+  "license": "MIT"
+} 

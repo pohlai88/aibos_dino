@@ -1,0 +1,266 @@
+{
+  "name": "AIBOS Hybrid Windows Platform - Canonical Registry",
+  "version": "1.0.3",
+  "description": "Single Source of Truth for AIBOS workspace architecture",
+  "lastUpdated": "2025-07-12",
+
+  "schemas": {
+    "owner": "DB Team",
+    "description": "Database schema definitions - ONLY ONE PER DOMAIN",
+    "files": [
+      "supabase/aibos-platform-schema.sql"
+    ],
+    "rules": [
+      "No duplicate schema files",
+      "All tables must be defined in aibos-platform-schema.sql",
+      "No separate schema files for individual features"
+    ]
+  },
+
+  "migrations": {
+    "owner": "DB Team",
+    "description": "Database migration scripts",
+    "directory": "supabase/migrations/",
+    "rules": [
+      "All migrations must be in supabase/migrations/",
+      "Use timestamped filenames: YYYYMMDD_HHMMSS_description.sql",
+      "No migrations outside this directory"
+    ]
+  },
+
+  "scripts": {
+    "owner": "Platform Engineering",
+    "description": "Core platform scripts - ONLY ONE PER FUNCTION",
+    "files": [
+      "scripts/setup-supabase.ts",
+      "scripts/migrate-to-supabase.ts",
+      "scripts/validate-ssot.ts",
+      "scripts/cleanup-workspace.ts"
+    ],
+    "rules": [
+      "No duplicate functionality",
+      "Each script has a single, clear purpose",
+      "No test scripts in production workspace",
+      "All scripts must support --help flag"
+    ]
+  },
+
+  "documentation": {
+    "owner": "Platform Engineering",
+    "description": "Architectural and user documentation",
+    "directory": "docs/",
+    "files": [
+      "docs/ARCHITECTURE_UNIFIED.md",
+      "docs/supabase-integration.md",
+      "docs/supabase-summary.md",
+      "docs/performance-optimization.md",
+      "docs/optimization-summary.md",
+      "docs/spotlight-roadmap.md",
+      "docs/shortcut-management.md",
+      "docs/favicon-setup.md",
+      "docs/aibos-requirements.md",
+      "docs/10min-challenge.md",
+      "docs/ai-agent-requirements.md"
+    ],
+    "rules": [
+      "All docs must be in docs/ directory",
+      "No duplicate documentation",
+      "Each document has unique scope",
+      "Use kebab-case for filenames"
+    ]
+  },
+
+  "services": {
+    "owner": "Platform Engineering",
+    "description": "Supabase service integrations",
+    "files": [
+      "api/files-supabase.ts",
+      "src/services/aibos-platform.ts"
+    ],
+    "rules": [
+      "One service per domain",
+      "All services must use tenant-based architecture",
+      "No duplicate service implementations"
+    ]
+  },
+
+  "apps": {
+    "owner": "App Developers",
+    "description": "App store applications",
+    "directory": "apps/",
+    "rules": [
+      "Each app in its own directory: apps/{slug}/",
+      "Apps must follow naming convention",
+      "No apps outside apps/ directory"
+    ]
+  },
+
+  "config": {
+    "owner": "Platform Engineering",
+    "description": "Configuration files",
+    "files": [
+      "deno.json",
+      "tsconfig.json",
+      "package.json",
+      ".gitignore",
+      "tailwind.config.js"
+    ],
+    "rules": [
+      "One config file per tool",
+      "No duplicate configuration",
+      "All configs must be at workspace root",
+      "tailwind.config.js is ESSENTIAL for AIBOS styling"
+    ]
+  },
+
+  "rootFiles": {
+    "owner": "Platform Engineering",
+    "description": "Files that must exist at workspace root",
+    "files": [
+      "README.md",
+      "workspace-canonical.json",
+      ".gitignore",
+      "tailwind.config.js"
+    ],
+    "rules": [
+      "These files must exist at workspace root",
+      "tailwind.config.js is required for AIBOS operation"
+    ]
+  },
+
+  "dependencies": {
+    "owner": "Platform Engineering",
+    "description": "Allowed external dependencies",
+    "allowed": [
+      "https://esm.sh/@supabase/supabase-js@2.38.4",
+      "https://deno.land/std@0.220.1/",
+      "https://esm.sh/react@18.2.0",
+      "https://esm.sh/react-dom@18.2.0",
+      "https://esm.sh/zustand@4.4.7",
+      "https://esm.sh/react-rnd@10.4.1",
+      "https://esm.sh/framer-motion@10.16.4"
+    ],
+    "rules": [
+      "Only listed dependencies can be imported in production code",
+      "All dependencies must be pinned to specific versions"
+    ]
+  },
+
+  "cleanup": {
+    "owner": "Platform Engineering",
+    "description": "Cleanup script configuration and targets",
+    "modes": {
+      "quick": {
+        "description": "Fast cleanup of build artifacts",
+        "targets": ["node_modules", "dist", "build", ".turbo", "coverage"],
+        "preserveEssential": true
+      },
+      "safe": {
+        "description": "Cleanup while preserving essential files",
+        "targets": [
+          "node_modules", "dist", "build", ".turbo", "coverage",
+          "test-*.ts", "create-tables.sql", "setup-database.ts",
+          "aibos-requirement.md", "10min-challenge.md", "ai-agent-preferences-and-requirements.md",
+          "os-metadata.json", "config.ts", "main.ts", "index.css", "deno.json", "deno.lock",
+          "package.json", "package-lock.json", "turbo.json"
+        ],
+        "preserveEssential": true
+      },
+      "full": {
+        "description": "Complete workspace cleanup and organization",
+        "targets": [
+          "node_modules", "dist", "build", ".turbo", "coverage",
+          "test-*.ts", "create-tables.sql", "setup-database.ts",
+          "aibos-requirement.md", "10min-challenge.md", "ai-agent-preferences-and-requirements.md",
+          "os-metadata.json", "config.ts", "main.ts", "index.css", "deno.json", "deno.lock",
+          "package.json", "package-lock.json", "turbo.json"
+        ],
+        "preserveEssential": false
+      }
+    },
+    "essentialFiles": [
+      "tailwind.config.js"
+    ],
+    "rules": [
+      "Only one cleanup script: scripts/cleanup-workspace.ts",
+      "All cleanup modes must preserve essential files when specified",
+      "Cleanup must support --dry-run flag",
+      "Cleanup must generate detailed reports"
+    ]
+  },
+
+  "forbidden": {
+    "description": "Files and patterns that should never exist",
+    "patterns": [
+      { "glob": "**/test-*.ts", "reason": "Test scripts should not remain in production workspace" },
+      { "glob": "**/temp-*.ts", "reason": "Temporary scripts are forbidden in production" },
+      { "glob": "**/file-system-schema.sql", "reason": "Deprecated schema replaced by aibos-platform-schema.sql" },
+      { "glob": "**/node_modules/", "reason": "Node.js artifacts are not used in Deno projects" },
+      { "glob": "**/.turbo/", "reason": "Build artifacts should not exist in source control" },
+      { "glob": "**/dist/", "reason": "Build artifacts should not exist in source control" },
+      { "glob": "**/build/", "reason": "Build artifacts should not exist in source control" },
+      { "glob": "**/coverage/", "reason": "Coverage reports are ephemeral" },
+      { "glob": "**/create-tables.sql", "reason": "Legacy SQL replaced by Supabase schema" },
+      { "glob": "**/setup-database.ts", "reason": "Legacy setup replaced by Supabase migration" },
+      { "glob": "**/aibos-requirement.md", "reason": "Legacy documentation should be in docs/" },
+      { "glob": "**/10min-challenge.md", "reason": "Legacy documentation should be in docs/" },
+      { "glob": "**/ai-agent-preferences-and-requirements.md", "reason": "Legacy documentation should be in docs/" },
+      { "glob": "**/os-metadata.json", "reason": "Legacy metadata file" },
+      { "glob": "**/config.ts", "reason": "Legacy config file" },
+      { "glob": "**/main.ts", "reason": "Legacy main file (duplicate)" },
+      { "glob": "**/index.css", "reason": "Legacy CSS file (duplicate)" },
+      { "glob": "**/deno.json", "reason": "Legacy Deno config (duplicate)" },
+      { "glob": "**/deno.lock", "reason": "Legacy lock file (duplicate)" },
+      { "glob": "**/package.json", "reason": "Node.js package file (not used in Deno)" },
+      { "glob": "**/package-lock.json", "reason": "Node.js lock file (not used in Deno)" },
+      { "glob": "**/turbo.json", "reason": "Turbo config (not used in Deno)" }
+    ],
+    "rules": [
+      "No test files in production workspace",
+      "No duplicate schema files",
+      "No build artifacts",
+      "No temporary files",
+      "No legacy documentation in root",
+      "No Node.js artifacts in Deno project"
+    ]
+  },
+
+  "aiAgentBoundaries": {
+    "description": "Where AI agents can and cannot write",
+    "allowed": [
+      "apps/*/",
+      "src/components/",
+      "src/utils/",
+      "docs/ (new documentation only)"
+    ],
+    "forbidden": [
+      "supabase/",
+      "scripts/",
+      "workspace-canonical.json",
+      "deno.json",
+      "tsconfig.json",
+      "tailwind.config.js"
+    ],
+    "allowedExtensions": [".ts", ".tsx", ".md"],
+    "rules": [
+      "AI agents can only extend, never redefine core truths",
+      "AI agents cannot modify schema or core scripts",
+      "AI agents must follow naming conventions",
+      "AI agents cannot modify essential config files"
+    ]
+  },
+
+  "validation": {
+    "owner": "Platform Engineering",
+    "description": "Validation rules and checks",
+    "scripts": [
+      "scripts/validate-ssot.ts"
+    ],
+    "rules": [
+      "All changes must pass SSOT validation",
+      "No forbidden patterns should exist",
+      "All required files must be present",
+      "Directory structure must match canonical layout"
+    ]
+  }
+}
