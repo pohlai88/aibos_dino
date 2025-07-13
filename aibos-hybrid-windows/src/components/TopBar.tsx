@@ -1,7 +1,12 @@
-import React, { memo, useState, useEffect } from 'react';
+/** @jsxImportSource react */
+import React, { memo, useState, useEffect, useMemo, useCallback } from 'react';
 import { Clock } from './Clock.tsx';
 import { useUIState } from '../store/uiState.ts';
 import { Tooltip } from './Tooltip.tsx';
+import { getColor, getGradient, applyThemeWithCSS } from '../utils/themeHelpers.ts';
+import { animation } from '../utils/designTokens.ts';
+import { NotificationCenter } from './NotificationCenter.tsx';
+import { notificationManager } from '../services/notificationManager.ts';
 
 // cSpell:disable-next-line
 const TOPBAR_HEIGHT = 'h-10';
@@ -19,19 +24,37 @@ interface SystemStatus {
 }
 
 const UserAvatar: React.FC = memo(() => {
-  const { toggleUserMenu } = useUIState();
+  const { toggleUserMenu, colorMode } = useUIState();
 
-  const handleUserMenu = () => {
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const avatarStyles = useMemo(() => ({
+    background: getGradient('branded.primary', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
+  const handleUserMenu = useCallback(() => {
     toggleUserMenu();
-  };
+  }, [toggleUserMenu]);
 
   return (
     <Tooltip content="User menu" shortcut="Ctrl+U" position="bottom">
       <div
-        className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500 transition-all duration-200 flex items-center justify-center text-white text-sm font-medium cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
+        style={avatarStyles}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105"
         role="button"
         tabIndex={0}
         aria-label="User menu"
+        aria-haspopup="true"
+        aria-expanded="false"
         onClick={handleUserMenu}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -49,14 +72,23 @@ const UserAvatar: React.FC = memo(() => {
 const Logo: React.FC = memo(() => {
   const { navigateHome } = useUIState();
 
-  const handleHome = () => {
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  const handleHome = useCallback(() => {
     navigateHome();
-  };
+  }, [navigateHome]);
 
   return (
     <Tooltip content="AI-BOS Home" shortcut="Ctrl+H">
       <div
-        className="text-white text-lg font-bold tracking-widest hover:text-gray-200 transition-all duration-200 cursor-pointer select-none transform hover:scale-105"
+        className="text-white text-lg font-bold tracking-widest hover:text-gray-200 cursor-pointer select-none transform hover:scale-105"
+        style={{
+          transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+        }}
         role="link"
         tabIndex={0}
         aria-label="Go to AI-BOS home screen"
@@ -74,40 +106,213 @@ const Logo: React.FC = memo(() => {
   );
 });
 
-const ClockWrapper: React.FC = memo(() => (
-  <div
-    className="text-xs text-gray-200 bg-black bg-opacity-20 px-3 py-1 rounded-full backdrop-blur-sm border border-white border-opacity-10"
-    role="status"
-    aria-live="polite"
-    aria-label="Current time and date"
-  >
-    <Clock />
-  </div>
-));
+const ClockWrapper: React.FC = memo(() => {
+  const { colorMode } = useUIState();
 
-const ThemeToggle: React.FC = memo(() => {
-  const { theme, cycleTheme } = useUIState();
-
-  const getThemeIcon = () => {
-    // Return a generic theme icon since we have many theme variants
-    return '🎨';
-  };
+  // Performance: Memoized theme-aware styles
+  const clockStyles = useMemo(() => ({
+    backgroundColor: getColor('glass.dark.20', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.dark.30', colorMode)}`,
+    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+  }), [colorMode]);
 
   return (
-    <Tooltip content={`Cycle theme (${theme})`} shortcut="Ctrl+T" position="bottom">
+    <div
+      style={clockStyles}
+      className="text-xs text-gray-200 px-3 py-1 rounded-full"
+      role="status"
+      aria-live="polite"
+      aria-label="Current time and date"
+    >
+      <Clock />
+    </div>
+  );
+});
+
+const WindowGroupsButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) => {
+  const { colorMode, windowGroups } = useUIState();
+
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    background: getGradient('professional.slate', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
+  const groupCount = Object.keys(windowGroups).length;
+
+  return (
+    <Tooltip content="Window Groups & Tabs" shortcut="Ctrl+G" position="bottom">
       <button
         type="button"
-        onClick={cycleTheme}
-        className="w-7 h-7 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 transition-all duration-200 flex items-center justify-center text-white text-sm font-medium cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
-        aria-label={`Cycle theme (current: ${theme})`}
+        onClick={onOpen}
+        style={buttonStyles}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105 relative"
+        aria-label="Window Groups & Tabs"
       >
-        {getThemeIcon()}
+        📑
+        {groupCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {groupCount}
+          </span>
+        )}
       </button>
     </Tooltip>
   );
 });
 
+const GridLayoutButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) => {
+  const { colorMode } = useUIState();
+
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    background: getGradient('professional.slate', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
+  return (
+    <Tooltip content="Grid Layout Manager" shortcut="Ctrl+L" position="bottom">
+      <button
+        type="button"
+        onClick={onOpen}
+        style={buttonStyles}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105"
+        aria-label="Grid Layout Manager"
+      >
+        🔲
+      </button>
+    </Tooltip>
+  );
+});
+
+const NotificationButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) => {
+  const { colorMode } = useUIState();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    background: getGradient('professional.slate', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
+  // Update unread count
+  useEffect(() => {
+    const updateCount = () => setUnreadCount(notificationManager.getUnreadCount());
+    updateCount();
+    
+    // Poll for updates
+    const interval = setInterval(updateCount, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <Tooltip content="Notifications" shortcut="Ctrl+N" position="bottom">
+      <button
+        type="button"
+        onClick={onOpen}
+        style={buttonStyles}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105 relative"
+        aria-label="Notifications"
+      >
+        🔔
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+    </Tooltip>
+  );
+});
+
+const ThemeToggle: React.FC = memo(() => {
+  const { theme, cycleTheme, colorMode, setColorMode } = useUIState();
+
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    background: getGradient('professional.slate', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
+  const getThemeIcon = useCallback(() => {
+    // Return a generic theme icon since we have many theme variants
+    return '🎨';
+  }, []);
+
+  const toggleColorMode = useCallback(() => {
+    const newMode = colorMode === 'light' ? 'dark' : 'light';
+    setColorMode(newMode);
+    applyThemeWithCSS(newMode);
+  }, [colorMode, setColorMode]);
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Tooltip content={`Toggle ${colorMode === 'light' ? 'Dark' : 'Light'} Mode`} shortcut="Ctrl+D" position="bottom">
+        <button
+          type="button"
+          onClick={toggleColorMode}
+          style={buttonStyles}
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105"
+          aria-label={`Toggle ${colorMode === 'light' ? 'Dark' : 'Light'} Mode`}
+          aria-pressed={colorMode === 'dark'}
+        >
+          {colorMode === 'light' ? '🌙' : '☀️'}
+        </button>
+      </Tooltip>
+      
+      <Tooltip content={`Cycle theme (${theme})`} shortcut="Ctrl+T" position="bottom">
+        <button
+          type="button"
+          onClick={cycleTheme}
+          style={buttonStyles}
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105"
+          aria-label={`Cycle theme (current: ${theme})`}
+        >
+          {getThemeIcon()}
+        </button>
+      </Tooltip>
+    </div>
+  );
+});
+
 const SystemStatusIndicator: React.FC = memo(() => {
+  const { colorMode } = useUIState();
   const [status, setStatus] = useState<SystemStatus>({
     cpu: 45,
     memory: 62,
@@ -116,7 +321,40 @@ const SystemStatusIndicator: React.FC = memo(() => {
     notifications: 3
   });
 
-  // Simulate system status updates
+  // Performance: Memoized status color logic
+  const getStatusColor = useCallback((type: 'cpu' | 'memory' | 'network' | 'battery') => {
+    switch (type) {
+      case 'cpu':
+        return status.cpu > 80 ? 'bg-red-500' : status.cpu > 60 ? 'bg-yellow-500' : 'bg-green-500';
+      case 'memory':
+        return status.memory > 80 ? 'bg-red-500' : status.memory > 60 ? 'bg-yellow-500' : 'bg-green-500';
+      case 'network':
+        return status.network === 'online' ? 'bg-green-500' : status.network === 'slow' ? 'bg-yellow-500' : 'bg-red-500';
+      case 'battery':
+        return status.battery > 20 ? 'bg-green-500' : status.battery > 10 ? 'bg-yellow-500' : 'bg-red-500';
+      default:
+        return 'bg-green-500';
+    }
+  }, [status]);
+
+  const getNetworkIcon = useCallback(() => {
+    switch (status.network) {
+      case 'online': return '📶';
+      case 'slow': return '📶';
+      case 'offline': return '❌';
+      default: return '📶';
+    }
+  }, [status.network]);
+
+  const getBatteryIcon = useCallback(() => {
+    if (status.battery > 80) return '🔋';
+    if (status.battery > 60) return '🔋';
+    if (status.battery > 40) return '🔋';
+    if (status.battery > 20) return '🔋';
+    return '🔋';
+  }, [status.battery]);
+
+  // Simulate system status updates with performance optimization
   useEffect(() => {
     const interval = setInterval(() => {
       setStatus(prev => ({
@@ -130,40 +368,8 @@ const SystemStatusIndicator: React.FC = memo(() => {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusColor = (type: 'cpu' | 'memory' | 'network' | 'battery') => {
-    switch (type) {
-      case 'cpu':
-        return status.cpu > 80 ? 'bg-red-500' : status.cpu > 60 ? 'bg-yellow-500' : 'bg-green-500';
-      case 'memory':
-        return status.memory > 80 ? 'bg-red-500' : status.memory > 60 ? 'bg-yellow-500' : 'bg-green-500';
-      case 'network':
-        return status.network === 'online' ? 'bg-green-500' : status.network === 'slow' ? 'bg-yellow-500' : 'bg-red-500';
-      case 'battery':
-        return status.battery > 20 ? 'bg-green-500' : status.battery > 10 ? 'bg-yellow-500' : 'bg-red-500';
-      default:
-        return 'bg-green-500';
-    }
-  };
-
-  const getNetworkIcon = () => {
-    switch (status.network) {
-      case 'online': return '📶';
-      case 'slow': return '📶';
-      case 'offline': return '❌';
-      default: return '📶';
-    }
-  };
-
-  const getBatteryIcon = () => {
-    if (status.battery > 80) return '🔋';
-    if (status.battery > 60) return '🔋';
-    if (status.battery > 40) return '🔋';
-    if (status.battery > 20) return '🔋';
-    return '🔋';
-  };
-
   return (
-    <div className="hidden sm:flex items-center space-x-2">
+    <div className="hidden sm:flex items-center space-x-2" role="status" aria-label="System status indicators">
       {/* CPU Usage */}
       <Tooltip content={`CPU: ${status.cpu}%`} position="bottom">
         <div className="flex items-center space-x-1">
@@ -183,7 +389,7 @@ const SystemStatusIndicator: React.FC = memo(() => {
       {/* Network Status */}
       <Tooltip content={`Network: ${status.network}`} position="bottom">
         <div className="flex items-center space-x-1">
-          <span className="text-xs">{getNetworkIcon()}</span>
+          <span className="text-xs" aria-hidden="true">{getNetworkIcon()}</span>
           <div className={`w-2 h-2 rounded-full ${getStatusColor('network')} opacity-80`} />
         </div>
       </Tooltip>
@@ -191,7 +397,7 @@ const SystemStatusIndicator: React.FC = memo(() => {
       {/* Battery Status */}
       <Tooltip content={`Battery: ${Math.round(status.battery)}%`} position="bottom">
         <div className="flex items-center space-x-1">
-          <span className="text-xs">{getBatteryIcon()}</span>
+          <span className="text-xs" aria-hidden="true">{getBatteryIcon()}</span>
           <span className="text-xs text-gray-300">{Math.round(status.battery)}%</span>
         </div>
       </Tooltip>
@@ -200,15 +406,31 @@ const SystemStatusIndicator: React.FC = memo(() => {
 });
 
 const NotificationIndicator: React.FC = memo(() => {
+  const { colorMode } = useUIState();
   const [notifications, setNotifications] = useState(3);
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleToggle = () => {
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    background: getGradient('professional.slate', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
+  const handleToggle = useCallback(() => {
     setIsOpen(!isOpen);
     if (notifications > 0) {
       setNotifications(0);
     }
-  };
+  }, [isOpen, notifications]);
 
   return (
     <Tooltip content={`${notifications} notifications`} position="bottom">
@@ -216,12 +438,21 @@ const NotificationIndicator: React.FC = memo(() => {
         <button
           type="button"
           onClick={handleToggle}
-          className="w-7 h-7 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 transition-all duration-200 flex items-center justify-center text-white text-sm font-medium cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105 relative"
+          style={buttonStyles}
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105 relative"
           aria-label={`${notifications} notifications`}
+          aria-haspopup="true"
+          aria-expanded={isOpen}
         >
-          🔔
+          <span aria-hidden="true">🔔</span>
           {notifications > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse">
+            <span 
+              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold"
+              style={{ 
+                animation: prefersReducedMotion ? 'none' : 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' 
+              }}
+              aria-label={`${notifications} unread notifications`}
+            >
               {notifications > 9 ? '9+' : notifications}
             </span>
           )}
@@ -232,31 +463,73 @@ const NotificationIndicator: React.FC = memo(() => {
 });
 
 const SearchButton: React.FC = memo(() => {
-  const { toggleSpotlight } = useUIState();
+  const { toggleSpotlight, colorMode } = useUIState();
 
-  const handleSearch = () => {
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    background: getGradient('professional.slate', colorMode),
+    backdropFilter: `blur(8px)`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
+  const handleSearch = useCallback(() => {
     toggleSpotlight();
-  };
+  }, [toggleSpotlight]);
 
   return (
     <Tooltip content="Search" shortcut="Ctrl+K" position="bottom">
       <button
         type="button"
         onClick={handleSearch}
-        className="w-7 h-7 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 transition-all duration-200 flex items-center justify-center text-white text-sm font-medium cursor-pointer shadow-lg hover:shadow-xl transform hover:scale-105"
+        style={buttonStyles}
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105"
         aria-label="Search"
       >
-        🔍
+        <span aria-hidden="true">🔍</span>
       </button>
     </Tooltip>
   );
 });
 
-export const TopBar: React.FC = memo(() => {
+interface TopBarProps {
+  className?: string;
+  deviceInfo?: import('../utils/responsive.ts').DeviceInfo;
+  onOpenWindowGroups?: () => void;
+  onOpenGridLayout?: () => void;
+  onOpenNotifications?: () => void;
+}
+
+const TopBar: React.FC<TopBarProps> = ({ className = '', onOpenWindowGroups, onOpenGridLayout, onOpenNotifications }) => {
+  const { theme, setTheme, colorMode } = useUIState();
+
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const headerStyles = useMemo(() => ({
+    backgroundColor: getColor('glass.dark.40', colorMode),
+    backdropFilter: `blur(12px)`,
+    borderBottom: `1px solid ${getColor('glass.dark.30', colorMode)}`,
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
   return (
     <header
+      style={headerStyles}
       // cSpell:disable-next-line
-      className={`fixed top-0 left-0 w-full ${TOPBAR_HEIGHT} bg-black bg-opacity-40 backdrop-blur-md flex items-center justify-between px-4 ${TOPBAR_Z_INDEX} border-b border-white border-opacity-10 shadow-lg`}
+      className={`fixed top-0 left-0 w-full flex items-center justify-between px-6 ${TOPBAR_HEIGHT} ${TOPBAR_Z_INDEX} bg-gradient-to-r from-gray-900/80 to-gray-800/80 backdrop-blur-lg border-b border-gray-700/40 shadow-lg transition-all duration-300 ${className}`}
       role="banner"
       aria-label="Top navigation bar"
     >
@@ -278,8 +551,20 @@ export const TopBar: React.FC = memo(() => {
         {/* Search Button */}
         <SearchButton />
         
-        {/* Notification Indicator */}
-        <NotificationIndicator />
+        {/* Window Groups Button */}
+        {onOpenWindowGroups && (
+          <WindowGroupsButton onOpen={onOpenWindowGroups} />
+        )}
+        
+        {/* Grid Layout Button */}
+        {onOpenGridLayout && (
+          <GridLayoutButton onOpen={onOpenGridLayout} />
+        )}
+        
+        {/* Notification Button */}
+        {onOpenNotifications && (
+          <NotificationButton onOpen={onOpenNotifications} />
+        )}
         
         {/* Theme Toggle Button */}
         <ThemeToggle />
@@ -289,12 +574,16 @@ export const TopBar: React.FC = memo(() => {
       </div>
     </header>
   );
-});
+};
+
+export default memo(TopBar);
 
 TopBar.displayName = 'TopBar';
 UserAvatar.displayName = 'UserAvatar';
 Logo.displayName = 'Logo';
 ClockWrapper.displayName = 'ClockWrapper';
+WindowGroupsButton.displayName = 'WindowGroupsButton';
+GridLayoutButton.displayName = 'GridLayoutButton';
 ThemeToggle.displayName = 'ThemeToggle';
 SystemStatusIndicator.displayName = 'SystemStatusIndicator';
 NotificationIndicator.displayName = 'NotificationIndicator';

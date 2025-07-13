@@ -1,19 +1,32 @@
-import React, { useState, useEffect, memo } from 'react';
+/** @jsxImportSource react */
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getColor, getGradient, applyThemeWithCSS } from '../utils/themeHelpers.ts';
+import { blur, elevation, animation } from '../utils/designTokens.ts';
 import { useUIState } from '../store/uiState.ts';
+import { useResponsiveConfig } from '../utils/responsive.ts';
 import { appRegistry } from '../services/appRegistry.ts';
 import { searchRegistry } from '../services/searchRegistry.ts';
 import { systemCommands } from '../services/systemCommands.ts';
 import { shortcutManager } from '../services/shortcutManager.ts';
+import { monitorManager } from '../services/monitorManager.ts';
 import { Window } from './Window.tsx';
 import { Spotlight } from './Spotlight.tsx';
 import { ShortcutHelp } from './ShortcutHelp.tsx';
 import { StartMenu } from './StartMenu.tsx';
 import { Dock } from './Dock.tsx';
-import { TopBar } from './TopBar.tsx';
+import TopBar from './TopBar.tsx';
 import { Notepad } from '../apps/Notepad.tsx';
 import { Files } from '../apps/Files.tsx';
 import { Calculator } from '../apps/Calculator.tsx';
+import iPod from '../apps/iPod.tsx';
 import { ThemeSelector } from './ThemeSelector.tsx';
+import MultiMonitorLayout from './MultiMonitorLayout.tsx';
+import { WindowGroupManager } from './WindowGroupManager.tsx';
+import { GridLayoutManager } from './GridLayoutManager.tsx';
+import { NotificationCenter } from './NotificationCenter.tsx';
+import { advancedCommandManager } from '../services/advancedCommands.ts';
+import { notificationManager } from '../services/notificationManager.ts';
 import type { AppInfo } from '../services/appRegistry.ts';
 
 // Type definitions for window objects
@@ -53,6 +66,15 @@ const initializeApps = () => {
       category: 'utilities',
       permissions: [],
       component: Calculator,
+    },
+    {
+      id: 'ipod',
+      title: 'iPod',
+      icon: '🎵',
+      description: 'Music player with playlist support',
+      category: 'entertainment',
+      permissions: ['storage'],
+      component: iPod,
     },
   ];
 
@@ -100,13 +122,19 @@ const initializeSearchProviders = () => {
 
 // Start button component
 const StartButton: React.FC = memo(() => {
-  const { toggleStartMenu } = useUIState();
+  const { toggleStartMenu, colorMode } = useUIState();
 
   return (
     <button
       type="button"
       onClick={toggleStartMenu}
-      className="fixed bottom-4 left-4 z-50 bg-black bg-opacity-50 text-white px-4 py-2 rounded hover:bg-opacity-70 transition-all duration-200 hover:scale-105 dark:bg-white dark:bg-opacity-10 dark:text-gray-200"
+      style={{
+        background: `linear-gradient(135deg, ${getColor('glass.dark.40', colorMode)}, ${getColor('glass.dark.30', colorMode)})`,
+        backdropFilter: 'blur(8px)',
+        border: `1px solid ${getColor('glass.dark.50', colorMode)}`,
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+      }}
+      className="fixed bottom-4 left-4 z-50 text-white px-4 py-2 rounded-lg hover:scale-105 transition-all duration-200"
       aria-label="Open start menu"
     >
       Start
@@ -116,11 +144,16 @@ const StartButton: React.FC = memo(() => {
 
 // Windows container component
 const WindowsContainer: React.FC = memo(() => {
-  const { openWindows, closeWindow } = useUIState();
+  const { openWindows, closeWindow, windowGroups, activeGroupId } = useUIState();
+
+  // Separate grouped and ungrouped windows
+  const groupedWindows = openWindows.filter((win: any) => win.groupId);
+  const ungroupedWindows = openWindows.filter((win: any) => !win.groupId);
 
   return (
     <div className="absolute inset-0">
-      {openWindows.map((win: OpenWindow) => {
+      {/* Render ungrouped windows normally */}
+      {ungroupedWindows.map((win: OpenWindow) => {
         const appInfo = appRegistry.get(win.component);
         if (!appInfo) return null;
 
@@ -138,41 +171,62 @@ const WindowsContainer: React.FC = memo(() => {
           />
         );
       })}
+
+      {/* Render grouped windows as tabbed windows */}
+      {Object.values(windowGroups).map((group: any) => {
+        const groupWindows = openWindows.filter((win: any) => group.windowIds.includes(win.id));
+        if (groupWindows.length === 0) return null;
+
+        // For now, render the first window in the group as a placeholder
+        // In a full implementation, this would be replaced with TabbedWindow component
+        const firstWindow = groupWindows[0];
+        const appInfo = appRegistry.get(firstWindow.component);
+        if (!appInfo) return null;
+
+        const Comp = appInfo.component;
+        
+        return (
+          <Window
+            key={`group-${group.id}`}
+            id={`group-${group.id}`}
+            title={`${group.name} (${groupWindows.length})`}
+            component={Comp}
+            props={firstWindow.props ?? {}}
+            zIndex={firstWindow.zIndex}
+            onClose={() => {
+              // Close all windows in the group
+              groupWindows.forEach((win: any) => closeWindow(win.id));
+            }}
+          />
+        );
+      })}
     </div>
   );
 });
 
 // Enhanced background system component
 const BackgroundSystem: React.FC = memo(() => {
-  const { theme } = useUIState();
+  const { theme, colorMode } = useUIState();
 
-  // Memoize background class to prevent unnecessary recalculations
-  const backgroundClass = React.useMemo(() => {
+  // Memoize gradient based on theme and color mode
+  const gradient = React.useMemo(() => {
     switch (theme) {
       case 'nebula':
-        return 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900';
-      case 'purple':
-        return 'bg-gradient-to-br from-purple-800 via-purple-700 to-purple-600';
-      case 'gray':
-        return 'bg-gradient-to-br from-gray-800 via-gray-700 to-gray-600';
-      case 'blue':
-        return 'bg-gradient-to-br from-blue-800 via-blue-700 to-blue-600';
-      case 'slate':
-        return 'bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600';
+        return getGradient('cosmic.nebula', colorMode);
       case 'ocean':
-        return 'bg-gradient-to-br from-cyan-800 via-blue-800 to-indigo-800';
-      case 'sunset':
-        return 'bg-gradient-to-br from-orange-800 via-red-800 to-pink-800';
+        return getGradient('nature.ocean', colorMode);
       case 'forest':
-        return 'bg-gradient-to-br from-green-800 via-emerald-800 to-teal-800';
-      case 'cosmic':
-        return 'bg-gradient-to-br from-indigo-800 via-purple-800 to-pink-800';
+        return getGradient('nature.forest', colorMode);
+      case 'sunset':
+        return getGradient('nature.sunset', colorMode);
       case 'aurora':
-        return 'bg-gradient-to-br from-green-700 via-blue-800 to-purple-800';
+        return getGradient('nature.aurora', colorMode);
+      case 'cosmic':
+        return getGradient('cosmic.cosmic', colorMode);
       default:
-        return 'bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900';
+        return getGradient('professional.slate', colorMode);
     }
-  }, [theme]);
+  }, [theme, colorMode]);
 
   // Memoize floating particles to prevent recreation on every render
   const floatingParticles = React.useMemo(() => 
@@ -186,11 +240,32 @@ const BackgroundSystem: React.FC = memo(() => {
   );
 
   return (
-    <div className={`absolute inset-0 ${backgroundClass} transition-all duration-1000`}>
+    <div 
+      className="absolute inset-0 transition-all duration-1000"
+      style={{ backgroundImage: gradient }}
+    >
       {/* Glass blobs with theme-aware colors */}
-      <div className="absolute w-96 h-96 bg-purple-600/20 rounded-full blur-3xl top-1/3 left-1/4 animate-pulse" />
-      <div className="absolute w-64 h-64 bg-blue-600/15 rounded-full blur-2xl bottom-1/4 right-1/3 animate-pulse delay-1000" />
-      <div className="absolute w-80 h-80 bg-indigo-600/10 rounded-full blur-2xl top-1/4 right-1/4 animate-pulse delay-500" />
+      <div 
+        style={{
+          background: `radial-gradient(circle, ${getColor('glass.light.20', colorMode)}, transparent)`,
+          backdropFilter: 'blur(40px)',
+        }}
+        className="absolute w-96 h-96 rounded-full blur-3xl top-1/3 left-1/4 animate-pulse" 
+      />
+      <div 
+        style={{
+          background: `radial-gradient(circle, ${getColor('glass.light.20', colorMode)}, transparent)`,
+          backdropFilter: 'blur(30px)',
+        }}
+        className="absolute w-64 h-64 rounded-full blur-2xl bottom-1/4 right-1/3 animate-pulse delay-1000" 
+      />
+      <div 
+        style={{
+          background: `radial-gradient(circle, ${getColor('glass.light.10', colorMode)}, transparent)`,
+          backdropFilter: 'blur(25px)',
+        }}
+        className="absolute w-80 h-80 rounded-full blur-2xl top-1/4 right-1/4 animate-pulse delay-500" 
+      />
       
       {/* Enhanced floating particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -223,9 +298,21 @@ const BackgroundSystem: React.FC = memo(() => {
 });
 
 export const Desktop: React.FC = memo(() => {
-  const { spotlightVisible, shortcutHelpVisible, closeShortcutHelp } = useUIState();
+  const { shortcutHelpVisible, closeShortcutHelp, colorMode } = useUIState();
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [multiMonitorVisible, setMultiMonitorVisible] = useState(false);
+  const [windowGroupManagerVisible, setWindowGroupManagerVisible] = useState(false);
+  const [gridLayoutManagerVisible, setGridLayoutManagerVisible] = useState(false);
+  const [notificationCenterVisible, setNotificationCenterVisible] = useState(false);
+  
+  // Expose multi-monitor function globally for system commands
+  useEffect(() => {
+    (window as any).openMultiMonitorLayout = () => setMultiMonitorVisible(true);
+    return () => {
+      delete (window as any).openMultiMonitorLayout;
+    };
+  }, []);
   
   // Initialize global shortcuts
   shortcutManager.initialize();
@@ -235,12 +322,22 @@ export const Desktop: React.FC = memo(() => {
     try {
       initializeApps();
       initializeSearchProviders();
+      
+      // Initialize monitor manager for multi-monitor support
+      monitorManager.initialize();
+      
+      // Initialize advanced command manager
+      advancedCommandManager.initialize();
+      
+      // Apply initial theme with CSS variables
+      applyThemeWithCSS(colorMode);
+      
       setIsInitialized(true);
     } catch (err) {
       console.error('Failed to initialize desktop:', err);
       setError(err instanceof Error ? err.message : 'Initialization failed');
     }
-  }, []);
+  }, [colorMode]);
 
   // Show loading state while initializing
   if (!isInitialized) {
@@ -274,33 +371,41 @@ export const Desktop: React.FC = memo(() => {
     );
   }
 
+  const { responsiveClasses } = useResponsiveConfig();
+
   return (
-    <div className={`w-screen h-screen relative overflow-hidden transition-colors duration-500`}>
+    <div className={`relative w-screen h-screen overflow-hidden transition-colors duration-500 ${responsiveClasses.container}`}>
       <BackgroundSystem />
-      
-      {/* Top bar */}
-      <TopBar />
-
-      {/* Dock */}
-      <Dock />
-
-      {/* Start button */}
-      <StartButton />
-
-      {/* Windows */}
+      <TopBar 
+        onOpenWindowGroups={() => setWindowGroupManagerVisible(true)}
+        onOpenGridLayout={() => setGridLayoutManagerVisible(true)}
+        onOpenNotifications={() => setNotificationCenterVisible(true)}
+      />
       <WindowsContainer />
-
-      {/* Start Menu */}
+      <Dock />
+      <Spotlight />
       <StartMenu />
-
-      {/* Spotlight overlay */}
-      {spotlightVisible && <Spotlight />}
-
-      {/* Shortcut help modal */}
       <ShortcutHelp isVisible={shortcutHelpVisible} onClose={closeShortcutHelp} />
+      <ThemeSelector />
+      <MultiMonitorLayout isVisible={multiMonitorVisible} onClose={() => setMultiMonitorVisible(false)} />
+      <WindowGroupManager 
+        isVisible={windowGroupManagerVisible} 
+        onClose={() => setWindowGroupManagerVisible(false)} 
+      />
+      <GridLayoutManager 
+        isVisible={gridLayoutManagerVisible} 
+        onClose={() => setGridLayoutManagerVisible(false)} 
+      />
+      <NotificationCenter 
+        isVisible={notificationCenterVisible} 
+        onClose={() => setNotificationCenterVisible(false)} 
+      />
+      {/* Prepare for mobile window collapse/tab mode here */}
     </div>
   );
 });
+
+export default Desktop;
 
 // Add display names for better debugging
 Desktop.displayName = 'Desktop';
