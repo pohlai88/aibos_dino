@@ -99,7 +99,7 @@ module.exports = {
   },
   plugins: [
     // Custom plugin for glassmorphism utilities
-    function({ addUtilities, theme }) {
+    function({ addUtilities, _theme }) {
       const glassmorphismUtilities = {
         '.glass-light': {
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
