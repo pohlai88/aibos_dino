@@ -13,7 +13,7 @@ type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 interface ServerLogContext {
   component?: string;
   action?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // Deno-compatible environment detection

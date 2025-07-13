@@ -38,7 +38,7 @@ export const supabase = createClient(
 export async function testConnection(): Promise<boolean> {
   try {
     // Try a simple query to test the connection
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('information_schema.tables')
       .select('table_name')
       .limit(1);

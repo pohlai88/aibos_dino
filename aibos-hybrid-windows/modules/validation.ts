@@ -44,7 +44,7 @@ const INVALID_PATH_CHARS = /[\x00-\x1f]/;
  * @returns ValidationResult
  */
 export function validateSlug(slug: string, options: ValidationOptions = {}): ValidationResult {
-  const { strict = true, allowEmpty = false, maxLength = 50, minLength = 1 } = options;
+  const { allowEmpty = false, maxLength = 50, minLength = 1 } = options;
   const errors: string[] = [];
   const warnings: string[] = [];
 

@@ -16,7 +16,7 @@ import { logError, logInfo } from './logging.ts';
  */
 export async function loadCanonicalRegistry(): Promise<Record<string, unknown>> {
   try {
-    const registry = await readJsonFile("workspace-canonical.json");
+    const registry = await readJsonFile("workspace-canonical.json") as Record<string, unknown>;
     logInfo("✅ Successfully loaded canonical registry");
     return registry;
   } catch (error) {

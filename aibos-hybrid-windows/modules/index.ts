@@ -89,8 +89,7 @@ export {
   logWarn,
   logError,
   logSuccess,
-  logDebug,
-  createLogger
+  logDebug
 } from './logging.ts';
 
 // Supabase utilities
