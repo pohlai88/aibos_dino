@@ -362,25 +362,25 @@ class HapticManager {
     }
   }
 
-  private async vibrate(pattern: number[]): Promise<void> {
-    if (!this.isSupported || !this.config.enabled) return;
+  private vibrate(pattern: number[]): Promise<void> {
+    if (!this.isSupported || !this.config.enabled) return Promise.resolve();
 
     // NEW: Check accessibility mode
     if (this.accessibilityMode) {
       this.logger?.log?.('Vibration blocked by accessibility mode');
-      return;
+      return Promise.resolve();
     }
 
     // NEW: Check for overlapping vibrations
     if (this.isVibrating) {
       this.logger?.log?.('Vibration blocked - already vibrating');
-      return;
+      return Promise.resolve();
     }
 
     // NEW: Check throttling
     if (this.shouldThrottle()) {
       this.logger?.log?.('Vibration throttled for performance');
-      return;
+      return Promise.resolve();
     }
 
     try {

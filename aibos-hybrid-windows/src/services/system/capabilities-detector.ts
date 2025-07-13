@@ -1,4 +1,4 @@
-import { SystemCapabilities } from './types';
+import { SystemCapabilities } from './types.ts';
 
 export class CapabilitiesDetector {
   detect(): SystemCapabilities {

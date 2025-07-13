@@ -1,6 +1,20 @@
-import { PowerState, SystemCapabilities } from './types';
-import { Logger } from '../core/logger';
-import { EventThrottler } from '../core/event-throttler';
+import { PowerState, SystemCapabilities } from './types.ts';
+import { Logger } from '../core/logger.ts';
+import { EventThrottler } from '../core/event-throttler.ts';
+
+// Web API type declarations for battery management
+declare global {
+  interface Navigator {
+    getBattery(): Promise<BatteryManager>;
+  }
+  
+  interface BatteryManager extends EventTarget {
+    charging: boolean;
+    chargingTime: number;
+    dischargingTime: number;
+    level: number;
+  }
+}
 
 export class PowerManagementService {
   private logger: Logger;
@@ -56,12 +70,18 @@ export class PowerManagementService {
   getPowerState(): PowerState | null {
     if (!this.battery) return null;
 
-    return {
+    const powerState: PowerState = {
       isCharging: this.battery.charging,
       batteryLevel: this.battery.level * 100,
-      timeRemaining: this.battery.dischargingTime > 0 ? this.battery.dischargingTime / 1000 : undefined,
       powerMode: 'balanced' // Default, could be enhanced with actual detection
     };
+
+    // Only add timeRemaining if it has a valid value
+    if (this.battery.dischargingTime > 0) {
+      powerState.timeRemaining = this.battery.dischargingTime / 1000;
+    }
+
+    return powerState;
   }
 
   getBatteryInfo() {

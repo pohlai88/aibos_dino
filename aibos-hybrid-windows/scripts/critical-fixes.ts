@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-all
 
-import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
+import { logInfo, logSuccess } from '../modules/logging.ts';
 
 interface FixResult {
   file: string;
@@ -16,16 +16,16 @@ class CriticalFixer {
     logInfo('🔧 Starting Critical Fixes for AI-BOS UI Shell');
     logInfo('==================================================');
 
-    await this.fixTypeScriptErrors();
-    await this.optimizePerformance();
-    await this.cleanupUnusedCode();
+    this.fixTypeScriptErrors();
+    this.optimizePerformance();
+    this.cleanupUnusedCode();
     await this.generateReport();
 
     logInfo('==================================================');
     logSuccess('🎉 Critical fixes completed!');
   }
 
-  private async fixTypeScriptErrors(): Promise<void> {
+  private fixTypeScriptErrors(): void {
     logInfo('Step 1: Fixing TypeScript Errors');
     
     // Fix React type conflicts
@@ -67,7 +67,7 @@ class CriticalFixer {
     });
   }
 
-  private async optimizePerformance(): Promise<void> {
+  private optimizePerformance(): void {
     logInfo('Step 2: Performance Optimizations');
     
     // React.memo optimizations
@@ -96,7 +96,7 @@ class CriticalFixer {
     });
   }
 
-  private async cleanupUnusedCode(): Promise<void> {
+  private cleanupUnusedCode(): void {
     logInfo('Step 3: Code Cleanup');
     
     this.record({

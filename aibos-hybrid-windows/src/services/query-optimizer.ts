@@ -13,10 +13,10 @@ class QueryOptimizer {
   private readonly FAST_TTL = 1000;
   private logger = new EnterpriseLogger();
   
-  async getTenantsOptimized(page = 0, limit = 20): Promise<Record<string, unknown>> {
+  async getTenantsOptimized(page = 0, limit = 20): Promise<unknown> {
     const cacheKey = `tenants_${page}_${limit}`;
     const cached = this.getFromCache(cacheKey);
-    if (cached) return cached;
+    if (cached !== null) return cached;
     
     const startTime = performance.now();
     
@@ -40,10 +40,10 @@ class QueryOptimizer {
   }
   
   // Optimized notes queries with intelligent caching
-  async getNotesOptimized(tenantId: string, limit = 50): Promise<Record<string, unknown>> {
+  async getNotesOptimized(tenantId: string, limit = 50): Promise<unknown> {
     const cacheKey = `notes_${tenantId}_${limit}`;
     const cached = this.getFromCache(cacheKey);
-    if (cached) return cached;
+    if (cached !== null) return cached;
     
     const startTime = performance.now();
     
@@ -65,10 +65,10 @@ class QueryOptimizer {
   }
   
   // Optimized RPC calls with result caching
-  async getTenantMetricsOptimized(tenantId: string): Promise<Record<string, unknown>> {
+  async getTenantMetricsOptimized(tenantId: string): Promise<unknown> {
     const cacheKey = `metrics_${tenantId}`;
     const cached = this.getFromCache(cacheKey);
-    if (cached) return cached;
+    if (cached !== null) return cached;
     
     const startTime = performance.now();
     

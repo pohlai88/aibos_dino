@@ -114,8 +114,8 @@ class MigrationService {
       path,
       name: item.name,
       type: item.type,
-      size: item.type === 'file' ? (item as any).size || 0 : 0,
-      content: item.type === 'file' ? (item as any).content : null,
+      size: item.type === 'file' ? (item as unknown as { size?: number }).size || 0 : 0,
+      content: item.type === 'file' ? (item as unknown as { content?: string }).content : null,
       created_by: userId,
       created_at: item.modified,
       updated_at: item.modified,
@@ -132,8 +132,8 @@ class MigrationService {
     logSuccess(`  ✅ Migrated: ${item.name} (${item.type})`);
   }
 
-  private async getOrCreateDefaultTenant(userId: string): Promise<string> {
-    const { data, error } = await supabase
+  private async getOrCreateDefaultTenant(_userId: string): Promise<string> {
+    const { data, error: _error } = await supabase
       .from('tenants')
       .select('id')
       .eq('name', 'Default Migration Tenant')
@@ -164,26 +164,26 @@ class MigrationService {
   }
 
   private async createTestUser(): Promise<string> {
-    const userId = crypto.randomUUID();
+    const _userId = crypto.randomUUID();
     const now = new Date().toISOString();
 
     const user = {
-      id: userId,
+      id: _userId,
       email: 'migration@example.com',
       created_at: now,
       updated_at: now,
     };
 
-    const { error } = await supabase
+    const { error: _error } = await supabase
       .from('users')
       .insert(user);
 
-    if (error) {
-      logWarn(`⚠️ Could not create test user: ${error.message}`);
-      return userId; // Return UUID anyway for migration
+    if (_error) {
+      logWarn(`⚠️ Could not create test user: ${_error.message}`);
+      return _userId; // Return UUID anyway for migration
     }
 
-    return userId;
+    return _userId;
   }
 
   private async loadSourceData(): Promise<Record<string, FileItem[]> | null> {
@@ -194,7 +194,11 @@ class MigrationService {
     }
 
     try {
-      return await readJsonFile(dataPath);
+      const data = await readJsonFile(dataPath);
+      if (typeof data === 'object' && data !== null) {
+        return data as Record<string, FileItem[]>;
+      }
+      return null;
     } catch (error) {
       logError(`Failed to load source data: ${error}`);
       return null;
@@ -223,7 +227,7 @@ class MigrationService {
       errors: this.errors,
       config: {
         supabaseUrl: this.config.supabaseUrl,
-        dryRun: this.config.dryRun,
+        dryRun: !!this.config.dryRun,
       },
     };
 
@@ -254,7 +258,7 @@ async function main() {
   const config: MigrationConfig = {
     supabaseUrl,
     supabaseAnonKey,
-    supabaseServiceKey: supabaseServiceKey || undefined,
+    ...(supabaseServiceKey ? { supabaseServiceKey } : {}),
     dryRun,
   };
 

@@ -1,6 +1,6 @@
-import { SystemInfo } from './types';
-import { Logger } from '../core/logger';
-import { EventThrottler } from '../core/event-throttler';
+import { SystemInfo } from './types.ts';
+import { Logger } from '../core/logger.ts';
+import { EventThrottler } from '../core/event-throttler.ts';
 
 export class SystemInfoService {
   private systemInfo: SystemInfo;
@@ -50,7 +50,7 @@ export class SystemInfoService {
     });
   }
 
-  private async updateSystemInfo(): Promise<void> {
+  private updateSystemInfo(): void {
     try {
       // Memory
       if ('memory' in performance) {
@@ -87,7 +87,7 @@ export class SystemInfoService {
   destroy(): void {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
-      this.updateInterval = undefined;
+      this.updateInterval = 0;
     }
     this.isMonitoring = false;
 

@@ -4,7 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { z } from 'zod';
+import { z } from 'https://esm.sh/zod@3.22.4';
 
 // 🔥 ENHANCEMENT: Strongly typed event system
 type NotificationEvents = {
@@ -112,26 +112,26 @@ interface ChannelSender {
 }
 
 class EmailChannelSender implements ChannelSender {
-  async send(notification: Notification): Promise<boolean> {
+  send(notification: Notification): Promise<boolean> {
     // AWS SES implementation placeholder
     console.log(`[EMAIL] Sending: ${notification.title}`);
-    return true;
+    return Promise.resolve(true);
   }
 }
 
 class SMSChannelSender implements ChannelSender {
-  async send(notification: Notification): Promise<boolean> {
+  send(notification: Notification): Promise<boolean> {
     // Twilio implementation placeholder
     console.log(`[SMS] Sending: ${notification.title}`);
-    return true;
+    return Promise.resolve(true);
   }
 }
 
 class WebhookChannelSender implements ChannelSender {
-  async send(notification: Notification): Promise<boolean> {
+  send(notification: Notification): Promise<boolean> {
     // HTTP POST implementation placeholder
     console.log(`[WEBHOOK] Sending: ${notification.title}`);
-    return true;
+    return Promise.resolve(true);
   }
 }
 
@@ -210,39 +210,38 @@ export class EnterpriseNotificationService extends EventEmitter {
     event: K,
     data: NotificationEvents[K]
   ): void {
-    this.emit(event, data);
+    super.emit(event, data);
   }
   
   // Core notification methods
-  async send(
+  send(
     notification: Omit<Notification, 'id'>,
     channels: NotificationChannel[] = [NotificationChannel.BROWSER]
   ): Promise<string> {
     try {
+      const id = crypto.randomUUID();
+      const fullNotification = { ...notification, id };
+      
       // Validate notification
-      const validatedNotification = NotificationSchema.parse({
-        ...notification,
-        id: crypto.randomUUID()
-      });
+      const validatedNotification = NotificationSchema.parse(fullNotification);
       
       // Check rate limiting
       if (!this.checkRateLimit()) {
         throw new Error('Rate limit exceeded');
       }
       
-      // Check user preferences
+      // Check if should send based on preferences
       if (!this.shouldSend(validatedNotification, channels)) {
-        return validatedNotification.id;
+        return Promise.resolve(id);
       }
       
       // Add to queue
       this.addToQueue(validatedNotification);
+      
+      // Emit queued event
       this.emitTyped('notification:queued', { notification: validatedNotification });
       
-      // Send to channels
-      await this.sendToChannels(validatedNotification, channels);
-      
-      return validatedNotification.id;
+      return Promise.resolve(id);
     } catch (error) {
       this.handleError(error as Error, 'send', notification as Notification);
       throw error;
@@ -262,16 +261,14 @@ export class EnterpriseNotificationService extends EventEmitter {
     }
   }
   
-  private async processQueue(): Promise<void> {
+  private processQueue(): void {
     if (this.queue.length === 0) return;
     
-    const notification = this.queue.shift()!;
-    this.notifications.unshift(notification);
+    const notification = this.queue.shift();
+    if (!notification) return;
     
-    // Limit stored notifications
-    if (this.notifications.length > this.preferences.maxNotifications) {
-      this.notifications = this.notifications.slice(0, this.preferences.maxNotifications);
-    }
+    // Send to default channels
+    this.sendToChannels(notification, [NotificationChannel.BROWSER]);
   }
   
   private async sendToChannels(
@@ -288,13 +285,15 @@ export class EnterpriseNotificationService extends EventEmitter {
     
     results.forEach((result, index) => {
       const channel = enabledChannels[index];
-      if (result.status === 'fulfilled' && result.value) {
-        this.analytics.delivered++;
-        this.emitTyped('notification:delivered', { notification, channel });
-      } else {
-        this.analytics.failed++;
-        const error = result.status === 'rejected' ? result.reason.message : 'Unknown error';
-        this.emitTyped('notification:failed', { notification, error, channel });
+      if (channel) { // Ensure channel is defined
+        if (result.status === 'fulfilled' && result.value) {
+          this.analytics.delivered++;
+          this.emitTyped('notification:delivered', { notification, channel: channel as NotificationChannel });
+        } else {
+          this.analytics.failed++;
+          const error = result.status === 'rejected' ? result.reason.message : 'Unknown error';
+          this.emitTyped('notification:failed', { notification, error, channel: channel as NotificationChannel });
+        }
       }
     });
   }
@@ -304,61 +303,98 @@ export class EnterpriseNotificationService extends EventEmitter {
     channel: NotificationChannel
   ): Promise<boolean> {
     try {
+      let success = false;
+      
       switch (channel) {
-        case NotificationChannel.BROWSER:
-          return await this.sendBrowserNotification(notification);
-        case NotificationChannel.SYSTEM:
-          return await this.sendSystemNotification(notification);
-        case NotificationChannel.TOAST:
-          return await this.sendToastNotification(notification);
-        case NotificationChannel.BANNER:
-          return await this.sendBannerNotification(notification);
-        case NotificationChannel.EMAIL:
-        case NotificationChannel.SMS:
-        case NotificationChannel.WEBHOOK:
+        case NotificationChannel.BROWSER: {
+          success = this.sendBrowserNotification(notification);
+          break;
+        }
+        case NotificationChannel.SYSTEM: {
+          success = await this.sendSystemNotification(notification);
+          break;
+        }
+        case NotificationChannel.TOAST: {
+          success = await this.sendToastNotification(notification);
+          break;
+        }
+        case NotificationChannel.BANNER: {
+          success = await this.sendBannerNotification(notification);
+          break;
+        }
+        default: {
           const sender = this.channelSenders.get(channel);
-          return sender ? await sender.send(notification) : false;
-        default:
-          return false;
+          if (sender) {
+            success = await sender.send(notification);
+          }
+          break;
+        }
       }
+      
+      if (success) {
+        this.emitTyped('notification:delivered', { notification, channel });
+      } else {
+        this.emitTyped('notification:failed', { notification, error: 'Channel failed', channel });
+      }
+      
+      return success;
     } catch (error) {
-      this.handleError(error as Error, `sendToChannel:${channel}`, notification);
+      this.emitTyped('notification:failed', { 
+        notification, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        channel 
+      });
       return false;
     }
   }
-  
+
   // Channel implementations
-  private async sendBrowserNotification(notification: Notification): Promise<boolean> {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(notification.title, {
+  private sendBrowserNotification(notification: Notification): boolean {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return false;
+    }
+    
+    if (Notification.permission === 'granted') {
+      const options: NotificationOptions = {
         body: notification.message,
-        icon: notification.icon,
-        badge: notification.badge,
-        image: notification.image,
+        requireInteraction: notification.requireInteraction,
         silent: notification.silent,
-        requireInteraction: notification.requireInteraction
-      });
+      };
+      
+      if (notification.icon) options.icon = notification.icon;
+      if (notification.badge) options.badge = notification.badge;
+      if (notification.tag) options.tag = notification.tag;
+      if (notification.metadata) options.data = notification.metadata;
+      
+      const browserNotification = new Notification(notification.title, options);
+      
+      // Add click handler
+      browserNotification.onclick = () => {
+        this.emitTyped('notification:clicked', { notification });
+      };
+      
       return true;
     }
+    
     return false;
   }
-  
-  private async sendSystemNotification(notification: Notification): Promise<boolean> {
+
+  private sendSystemNotification(notification: Notification): Promise<boolean> {
     // System notification implementation
     console.log(`[SYSTEM] ${notification.title}: ${notification.message}`);
-    return true;
+    return Promise.resolve(true);
   }
-  
-  private async sendToastNotification(notification: Notification): Promise<boolean> {
+
+  private sendToastNotification(notification: Notification): Promise<boolean> {
     // Toast notification implementation
     console.log(`[TOAST] ${notification.title}: ${notification.message}`);
-    return true;
+    return Promise.resolve(true);
   }
-  
-  private async sendBannerNotification(notification: Notification): Promise<boolean> {
+
+  private sendBannerNotification(notification: Notification): Promise<boolean> {
     // Banner notification implementation
     console.log(`[BANNER] ${notification.title}: ${notification.message}`);
-    return true;
+    return Promise.resolve(true);
   }
   
   // Utility methods
@@ -368,12 +404,20 @@ export class EnterpriseNotificationService extends EventEmitter {
       n => now - n.timestamp < this.config.rateLimitWindow
     );
     
-    if (this.recentNotifications.length >= this.config.rateLimitCount) {
-      return false;
-    }
+    const priorityWeights = {
+      low: 1,
+      normal: 2,
+      high: 3,
+      critical: 4
+    };
     
-    this.recentNotifications.push({ timestamp: now, id: crypto.randomUUID() });
-    return true;
+    const totalWeight = this.recentNotifications.reduce((sum, n) => {
+      const notification = this.notifications.find(notif => notif.id === n.id);
+      const priority = notification?.priority || 'normal';
+      return sum + (priorityWeights[priority as keyof typeof priorityWeights] || 1);
+    }, 0);
+    
+    return totalWeight <= this.config.rateLimitCount;
   }
   
   private shouldSend(notification: Notification, _channels: NotificationChannel[]): boolean {
@@ -420,17 +464,13 @@ export class EnterpriseNotificationService extends EventEmitter {
   
   // 🔥 ENHANCEMENT: Methods moved inside class
   getUnreadCount(): number {
-    return this.notifications.filter(n => !n.metadata?.read).length;
+    return this.notifications.filter(n => !(n as Record<string, unknown>)['read']).length;
   }
   
   markAsRead(id: string): boolean {
     const notification = this.notifications.find(n => n.id === id);
     if (notification) {
-      if (!notification.metadata) {
-        notification.metadata = {};
-      }
-      notification.metadata.read = true;
-      this.emitTyped('notification:updated', { notification });
+      (notification as Record<string, unknown>)['read'] = true;
       return true;
     }
     return false;
@@ -438,24 +478,22 @@ export class EnterpriseNotificationService extends EventEmitter {
   
   markAllAsRead(): void {
     this.notifications.forEach(n => {
-      if (!n.metadata) {
-        n.metadata = {};
-      }
-      n.metadata.read = true;
+      (n as Record<string, unknown>)['read'] = true;
     });
     this.emitTyped('notifications:all-read', undefined);
   }
   
-  async dismiss(id: string, reason: string = 'user'): Promise<boolean> {
-    const index = this.notifications.findIndex(n => n.id === id);
-    if (index !== -1) {
-      const notification = this.notifications[index];
-      this.notifications.splice(index, 1);
-      this.analytics.dismissed++;
-      this.emitTyped('notification:dismissed', { notification, reason });
-      return true;
-    }
-    return false;
+  dismiss(id: string, reason: string = 'user'): boolean {
+    const notification = this.notifications.find(n => n.id === id);
+    if (!notification) return false;
+    
+    // Remove from notifications
+    this.notifications = this.notifications.filter(n => n.id !== id);
+    
+    // Emit dismissed event
+    this.emitTyped('notification:dismissed', { notification, reason });
+    
+    return true;
   }
   
   getHistory(options: { limit?: number; category?: string } = {}): Notification[] {
@@ -482,7 +520,7 @@ export class EnterpriseNotificationService extends EventEmitter {
         n.type,
         n.priority,
         n.category || '',
-        n.metadata?.createdAt || ''
+        n.metadata?.['createdAt'] || ''
       ]);
       return [headers, ...rows].map(row => row.join(',')).join('\n');
     }
@@ -496,16 +534,19 @@ export class EnterpriseNotificationService extends EventEmitter {
   
   // 🔥 ENHANCEMENT: Centralized error handling
   private handleError(error: Error, context: string, notification?: Notification): void {
-    const errorData = {
+    const errorData: NotificationEvents['notification:error'] = {
       message: error.message,
       context,
-      notificationId: notification?.id,
       timestamp: new Date().toISOString(),
-      stack: error.stack
     };
     
-    // Ready for Sentry/Datadog integration
-    console.error('[NotificationService]', errorData);
+    if (notification?.id) {
+      errorData.notificationId = notification.id;
+    }
+    
+    if (error.stack) {
+      errorData.stack = error.stack;
+    }
     
     this.emitTyped('notification:error', errorData);
   }

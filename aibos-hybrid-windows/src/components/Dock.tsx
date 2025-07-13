@@ -102,7 +102,7 @@ export const Dock = memo(() => {
 
   // Check if apps are running
   const getRunningApps = () => {
-    return openWindows.map(win => win.component);
+    return openWindows.map((win: { component: string }) => win.component);
   };
 
   const runningApps = getRunningApps();
@@ -331,6 +331,7 @@ export const Dock = memo(() => {
           aria-label="Dock context menu"
         >
           <button
+            type="button"
             className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
             onClick={() => handleContextMenuAction('open', contextMenu.item)}
             role="menuitem"
@@ -342,6 +343,7 @@ export const Dock = memo(() => {
           
           {runningApps.includes(contextMenu.item.component) && (
             <button
+              type="button"
               className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
               onClick={() => handleContextMenuAction('close', contextMenu.item)}
               role="menuitem"
@@ -355,6 +357,7 @@ export const Dock = memo(() => {
           <div className="border-t border-gray-200 dark:border-gray-700 my-1" role="separator"></div>
           
           <button
+            type="button"
             className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
             onClick={() => handleContextMenuAction('info', contextMenu.item)}
             role="menuitem"

@@ -129,7 +129,6 @@ class ProductionBuilder {
 
   private removeConsoleStatements(content: string): [string, number] {
     let logsRemoved = 0;
-    const original = content;
 
     const patterns = [
       /console\.log\([^;]*\);?/g,

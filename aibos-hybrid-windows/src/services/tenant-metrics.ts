@@ -26,10 +26,18 @@ export async function getTenantMetrics(tenantId: string): Promise<ApiResponse<Re
         action: 'getTenantMetrics',
         metadata: { tenantId, error: error.message }
       });
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message,
+        timestamp: new Date()
+      };
     }
 
-    return { success: true, data: data || {} };
+    return { 
+      success: true, 
+      data: data || {},
+      timestamp: new Date()
+    };
   } catch (error) {
     logger.error('Unexpected error in getTenantMetrics', {
       component: 'TenantMetrics',
@@ -39,23 +47,41 @@ export async function getTenantMetrics(tenantId: string): Promise<ApiResponse<Re
         error: error instanceof Error ? error.message : String(error)
       }
     });
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date()
+    };
   }
 }
 
 export async function getAdvancedAnalytics(tenantId: string): Promise<ApiResponse<Record<string, unknown>>> {
+  const logger = new EnterpriseLogger();
+  
   try {
     const { data, error } = await supabase
       .rpc('get_advanced_analytics', { p_tenant_id: tenantId });
 
     if (error) {
-      this.logger.error(`Failed to fetch analytics: ${error.message}`, { component: 'TenantMetrics', action: 'getAdvancedAnalytics' });
-      return { success: false, error: error.message };
+      logger.error(`Failed to fetch analytics: ${error.message}`, { component: 'TenantMetrics', action: 'getAdvancedAnalytics' });
+      return { 
+        success: false, 
+        error: error.message,
+        timestamp: new Date()
+      };
     }
 
-    return { success: true, data: data || {} };
+    return { 
+      success: true, 
+      data: data || {},
+      timestamp: new Date()
+    };
   } catch (error) {
-    this.logger.error(`Analytics error: ${error instanceof Error ? error.message : String(error)}`, { component: 'TenantMetrics', action: 'getAdvancedAnalytics' });
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    logger.error(`Analytics error: ${error instanceof Error ? error.message : String(error)}`, { component: 'TenantMetrics', action: 'getAdvancedAnalytics' });
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date()
+    };
   }
 }

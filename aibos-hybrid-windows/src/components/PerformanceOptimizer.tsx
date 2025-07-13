@@ -40,7 +40,7 @@ export function useExpensiveCalculation<T>(
 }
 
 // Hook for stable callbacks with automatic memoization
-export function useStableCallback<T extends (...args: any[]) => any>(
+export function useStableCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   dependencies: React.DependencyList
 ): T {
@@ -118,7 +118,7 @@ export function autoOptimize<P extends object>(
   optimizationLevel: 'low' | 'medium' | 'high' = 'medium'
 ) {
   const optimizationConfig = {
-    low: { shouldMemoize: true, customComparison: undefined },
+    low: { shouldMemoize: true, customComparison: undefined as unknown as (prevProps: P, nextProps: P) => boolean },
     medium: { 
       shouldMemoize: true, 
       customComparison: (prevProps: P, nextProps: P) => !propsChanged(prevProps, nextProps)

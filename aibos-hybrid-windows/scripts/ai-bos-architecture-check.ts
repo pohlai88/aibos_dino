@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env --allow-read
 
-import { supabase, getDatabaseSchema, getTableColumns, checkRlsPolicies } from '../modules/supabase-client.ts';
+import { getDatabaseSchema, getTableColumns, checkRlsPolicies } from '../modules/supabase-client.ts';
 import { loadCanonicalRegistry } from '../modules/ssot-registry.ts';
 import { findFilesByPattern, fileExists } from '../modules/filesystem.ts';
 import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
@@ -15,10 +15,16 @@ async function validateSSOT(): Promise<{ errors: string[]; warnings: string[] }>
   logInfo('🔍 Validating Single Source of Truth...');
 
   // Check for forbidden files
-  for (const pattern of registry.forbidden?.patterns || []) {
-    const forbiddenFiles = await findFilesByPattern(pattern);
-    for (const file of forbiddenFiles) {
-      errors.push(`Forbidden file found: ${file}`);
+  const forbidden = (typeof registry === 'object' && registry !== null && 'forbidden' in registry) ? (registry as Record<string, unknown>)['forbidden'] : undefined;
+  const forbiddenPatterns = (typeof forbidden === 'object' && forbidden !== null && 'patterns' in forbidden) ? (forbidden as Record<string, unknown>)['patterns'] : undefined;
+  if (Array.isArray(forbiddenPatterns)) {
+    for (const pattern of forbiddenPatterns) {
+      if (typeof pattern === 'string') {
+        const forbiddenFiles = await findFilesByPattern(pattern);
+        for (const file of forbiddenFiles) {
+          errors.push(`Forbidden file found: ${file}`);
+        }
+      }
     }
   }
 
@@ -38,9 +44,9 @@ async function validateSSOT(): Promise<{ errors: string[]; warnings: string[] }>
   for (const category of Object.keys(registry)) {
     if (category === 'forbidden' || category === 'aiAgentBoundaries') continue;
     const categoryData = registry[category];
-    if (categoryData.files) {
-      for (const file of categoryData.files) {
-        if (!(await fileExists(file))) {
+    if (typeof categoryData === 'object' && categoryData !== null && 'files' in categoryData && Array.isArray((categoryData as Record<string, unknown>)['files'])) {
+      for (const file of (categoryData as Record<string, unknown>)['files'] as unknown[]) {
+        if (typeof file === 'string' && !(await fileExists(file))) {
           warnings.push(`Canonical file missing: ${file}`);
         }
       }
@@ -74,7 +80,7 @@ async function checkTables(expectedTables: Record<string, string[]>): Promise<Ch
 
 async function tableExists(tableName: string): Promise<boolean> {
   const schema = await getDatabaseSchema();
-  return schema.some((t: any) => t.table_name === tableName);
+  return schema.some((t: { table_name: string }) => t.table_name === tableName);
 }
 
 async function main() {

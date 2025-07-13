@@ -11,10 +11,10 @@ class StorageService {
   private dbVersion = 1;
   private db?: IDBDatabase;
 
-  async initialize(): Promise<void> {
+  initialize(): Promise<void> {
     if (!('indexedDB' in window)) {
       console.warn('IndexedDB not supported, falling back to localStorage only');
-      return;
+      return Promise.resolve();
     }
 
     return new Promise((resolve, reject) => {
@@ -35,7 +35,7 @@ class StorageService {
     });
   }
 
-  async setItem(key: string, value: unknown): Promise<void> {
+  setItem(key: string, value: unknown): Promise<void> {
     const serialized = JSON.stringify(value);
     const size = new Blob([serialized]).size;
     
@@ -43,7 +43,7 @@ class StorageService {
     if (size > this.STORAGE_THRESHOLD && this.db) {
       return this.setIndexedDB(key, value, size);
     } else {
-      return this.setLocalStorage(key, value);
+      return Promise.resolve(this.setLocalStorage(key, value));
     }
   }
 
@@ -57,7 +57,7 @@ class StorageService {
     return this.getLocalStorage<T>(key);
   }
 
-  private async setIndexedDB(key: string, value: unknown, size: number): Promise<void> {
+  private setIndexedDB(key: string, value: unknown, size: number): Promise<void> {
     if (!this.db) throw new Error('IndexedDB not initialized');
     
     return new Promise((resolve, reject) => {
@@ -86,8 +86,8 @@ class StorageService {
     }
   }
 
-  private async getIndexedDB<T>(key: string): Promise<T | null> {
-    if (!this.db) return null;
+  private getIndexedDB<T>(key: string): Promise<T | null> {
+    if (!this.db) return Promise.resolve(null);
     
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['storage'], 'readonly');

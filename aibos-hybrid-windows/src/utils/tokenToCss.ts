@@ -4,7 +4,7 @@ import { designTokens } from './designTokens.ts';
 // TOKEN TO CSS UTILITIES
 // ============================================================================
 
-type TokenObject = Record<string, string | Record<string, unknown>>;
+type TokenObject = Record<string, string | Record<string, unknown> | unknown>;
 
 /**
  * Converts a token object to CSS variables
@@ -20,8 +20,8 @@ export function generateCssVars(
       if (typeof value === 'string') {
         const varName = [...path, key].join('-');
         lines.push(`${prefix}-${varName}: ${value};`);
-      } else if (typeof value === 'object') {
-        process(value, [...path, key]);
+      } else if (typeof value === 'object' && value !== null) {
+        process(value as TokenObject, [...path, key]);
       }
     }
   }

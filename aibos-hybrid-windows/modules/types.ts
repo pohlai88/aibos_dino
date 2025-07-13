@@ -60,7 +60,7 @@ export interface FileOperationResult {
   success: boolean;
   path: string;
   error?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface FileSearchResult {
@@ -95,7 +95,7 @@ export interface Folder {
 export interface OperationError {
   message: string;
   code?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface OperationResult<T = FileItem | FileItem[]> {
@@ -119,10 +119,10 @@ export function isFolder(item: FileItem): item is Folder {
   return item.type === "folder";
 }
 
-export function isValidOperationResult<T>(result: any): result is OperationResult<T> {
+export function isValidOperationResult<T>(result: unknown): result is OperationResult<T> {
   return typeof result === "object" && 
          result !== null && 
-         typeof result.success === "boolean";
+         typeof (result as Record<string, unknown>)['success'] === "boolean";
 }
 
 export function hasError(result: OperationResult): result is OperationResult & { error: string | OperationError } {
@@ -182,7 +182,7 @@ export interface LogEntry {
   level: LogLevel;
   message: string;
   prefix?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -262,14 +262,14 @@ export interface OutputFormat {
 
 export interface ScriptError extends Error {
   code: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   timestamp: Date;
   scriptName?: string;
 }
 
 export interface ValidationError extends ScriptError {
   field: string;
-  value: any;
+  value: unknown;
   rule: string;
 }
 
@@ -299,7 +299,7 @@ export type AsyncResult<T, E = Error> = Promise<{ success: true; data: T } | { s
 // Event and Callback Types
 // ============================================================================
 
-export interface EventHandler<T = any> {
+export interface EventHandler<T = unknown> {
   (event: string, data: T): void | Promise<void>;
 }
 
@@ -315,7 +315,7 @@ export interface ErrorCallback {
 // API and HTTP Types
 // ============================================================================
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -328,21 +328,21 @@ export interface HttpRequest {
   method: string;
   url: string;
   headers: Record<string, string>;
-  body?: any;
+  body?: unknown;
 }
 
 export interface HttpResponse {
   status: number;
   statusText: string;
   headers: Record<string, string>;
-  body: any;
+  body: unknown;
 }
 
 // ============================================================================
 // Cache Types
 // ============================================================================
 
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   key: string;
   value: T;
   createdAt: Date;
@@ -366,7 +366,7 @@ export interface PerformanceMetric {
   value: number;
   unit: string;
   timestamp: Date;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 export interface PerformanceReport {
@@ -390,7 +390,7 @@ export interface TaskDefinition {
   id: string;
   name: string;
   description: string;
-  handler: () => Promise<any>;
+  handler: () => Promise<unknown>;
   dependencies?: string[];
   timeout?: number;
   retries?: number;
@@ -399,7 +399,7 @@ export interface TaskDefinition {
 export interface TaskResult {
   taskId: string;
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: ScriptError;
   duration: number;
   startTime: Date;

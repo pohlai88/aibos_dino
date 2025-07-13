@@ -2,23 +2,19 @@
 
 import { supabase } from '../modules/supabase-client.ts';
 import { writeTextFile } from '../modules/filesystem.ts';
-import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
+import { logInfo, logWarn, logSuccess } from '../modules/logging.ts';
 
 interface ScaffoldConfig {
   appsRoot: string;
   dryRun: boolean;
 }
 
-async function promptInput(message: string, required = true): Promise<string> {
-  let value = '';
-  do {
-    value = prompt(`${message} `) || '';
-  } while (required && !value.trim());
-  return value.trim();
+function promptInput(message: string): string {
+  return prompt(message) ?? '';
 }
 
-async function exitWithError(message: string) {
-  logError(message);
+function exitWithError(message: string): never {
+  console.error(`\n❌ ${message}`);
   Deno.exit(1);
 }
 
@@ -33,11 +29,11 @@ async function main() {
   logInfo('🚀 AIBOS App Integration Generator');
 
   // Gather app details
-  const name = await promptInput('App Name:');
-  const slug = await promptInput('App Slug (unique, lowercase, hyphens):');
-  const description = await promptInput('Short Description:');
-  const categorySlug = await promptInput('Category slug (e.g. productivity, utilities):');
-  const authorEmail = await promptInput('Author Email (optional):', false);
+  const name = promptInput('App Name:');
+  const slug = promptInput('App Slug (unique, lowercase, hyphens):');
+  const description = promptInput('Short Description:');
+  const categorySlug = promptInput('Category slug (e.g. productivity, utilities):');
+  const authorEmail = promptInput('Author Email (optional):');
 
   // Check for duplicate slugs
   const { data: existing, error: slugError } = await supabase
@@ -85,13 +81,17 @@ async function main() {
   // Register app
   let app;
   if (!config.dryRun) {
+    if (!category) {
+      await exitWithError(`Category not found.`);
+    }
+    const categoryId = category!.id;
     const { data, error } = await supabase
       .from('apps')
       .insert({
         name,
         slug,
         description,
-        category_id: category.id,
+        category_id: categoryId,
         author_id: authorId,
         status: 'draft',
         is_free: true,

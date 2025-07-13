@@ -1,78 +1,78 @@
 {
-  "timestamp": "2025-07-13T04:17:52.007Z",
+  "timestamp": "2025-07-13T17:59:06.203Z",
   "stats": {
-    "totalSize": 803595,
-    "fileCount": 68,
+    "totalSize": 1007583,
+    "fileCount": 105,
     "fileTypes": {
-      ".ts": {
-        "count": 33,
-        "size": 369081
-      },
       ".json": {
-        "count": 6,
-        "size": 29645
+        "count": 7,
+        "size": 35089
       },
       ".html": {
-        "count": 4,
-        "size": 20818
+        "count": 3,
+        "size": 18967
       },
       ".css": {
-        "count": 2,
-        "size": 9330
+        "count": 3,
+        "size": 15687
       },
       ".tsx": {
-        "count": 22,
-        "size": 370191
+        "count": 31,
+        "size": 456957
+      },
+      ".ts": {
+        "count": 60,
+        "size": 476352
       },
       ".js": {
         "count": 1,
-        "size": 4530
+        "size": 4531
       }
     },
     "largestFiles": [
       {
-        "path": "aibos-hybrid-windows\\src\\components\\TenantOnboarding.tsx",
-        "size": 29537
+        "path": "src\\components\\TenantOnboarding.tsx",
+        "size": 29831
       },
       {
-        "path": "aibos-hybrid-windows\\src\\services\\aibos-platform.ts",
-        "size": 25082
+        "path": "src\\utils\\audio.ts",
+        "size": 24914
       },
       {
-        "path": "aibos-hybrid-windows\\src\\utils\\audio.ts",
-        "size": 23446
+        "path": "src\\components\\AppStore.tsx",
+        "size": 23651
       },
       {
-        "path": "aibos-hybrid-windows\\src\\components\\PropertiesDialog.tsx",
-        "size": 23416
+        "path": "src\\components\\Clock.tsx",
+        "size": 23547
       },
       {
-        "path": "aibos-hybrid-windows\\src\\components\\AppStore.tsx",
-        "size": 23241
+        "path": "src\\components\\PropertiesDialog.tsx",
+        "size": 23458
       },
       {
-        "path": "aibos-hybrid-windows\\src\\components\\Clock.tsx",
-        "size": 23112
+        "path": "src\\apps\\Files.tsx",
+        "size": 23051
       },
       {
-        "path": "aibos-hybrid-windows\\src\\services\\shortcutManager.ts",
-        "size": 22174
+        "path": "src\\components\\PerformanceDashboard.tsx",
+        "size": 21619
       },
       {
-        "path": "aibos-hybrid-windows\\src\\services\\systemCommands.ts",
-        "size": 21901
+        "path": "src\\components\\MultiMonitorLayout.tsx",
+        "size": 21418
       },
       {
-        "path": "aibos-hybrid-windows\\src\\components\\MultiMonitorLayout.tsx",
-        "size": 21057
+        "path": "src\\components\\TopBar.tsx",
+        "size": 21107
       },
       {
-        "path": "aibos-hybrid-windows\\src\\components\\Window.tsx",
-        "size": 20644
+        "path": "src\\components\\ShortcutHelp.tsx",
+        "size": 20299
       }
     ],
     "performanceMetrics": {
-      "estimatedLoadTime": 0.3576383590698242,
+      "estimatedLoadTime": 0.4484228134155273,
       "compressionRatio": 0.7,
       "cacheEfficiency": 0.8
     }

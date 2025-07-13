@@ -3,6 +3,24 @@
  */
 
 import { EnterpriseLogger } from './core/logger.ts';
+import { supabase } from '../../modules/supabase-client.ts';
+import { FileIndexerService, FileMetadata as BaseFileMetadata } from './fileIndexer.ts';
+// import { SemanticSearchOptions } from '../types/search.ts';
+
+// Define SemanticSearchOptions locally if not exported
+export interface SemanticSearchOptions {
+  maxResults?: number;
+}
+
+// Extend FileMetadata for semantic properties
+export interface FileMetadata extends BaseFileMetadata {
+  extractedText?: string;
+  language?: string;
+  entities?: string[];
+  keywords?: string[];
+  sentiment?: string;
+  readingTime?: number;
+}
 
 export interface VectorStore {
   upsertVector(id: string, vector: number[], metadata: Record<string, unknown>): Promise<void>;
@@ -63,16 +81,15 @@ export class SupabaseVectorStore implements VectorStore {
 }
 
 // Enhanced FileIndexerService with Vector Store
-class _FileIndexerService {
+class _FileIndexerService extends FileIndexerService {
   private vectorStore: VectorStore;
-  private logger = new EnterpriseLogger();
+  // No logger property here; use base class logger where possible
   
   constructor(tenantId: string = 'default') {
-    this.tenantId = tenantId;
+    super(tenantId);
     this.vectorStore = new SupabaseVectorStore(tenantId);
   }
 
-  // ✅ Scalable semantic search with vector DB
   async semanticSearch(query: string, options: SemanticSearchOptions = {}): Promise<FileMetadata[]> {
     const queryEmbeddings = await this.generateEmbeddings(query);
     
@@ -88,13 +105,41 @@ class _FileIndexerService {
     // Retrieve full metadata
     const results: FileMetadata[] = [];
     for (const result of vectorResults) {
-      const metadata = this.index.fileIds.get(result.id);
+      // Use a method to get file by id, since index is private
+      const metadata = this.getFileById(result.id);
       if (metadata) {
-        results.push(metadata);
+        results.push(metadata as FileMetadata);
       }
     }
     
     return results;
+  }
+
+  // Helper to access file by id (simulate index access)
+  protected getFileById(_id: string): BaseFileMetadata | undefined {
+    // This is a placeholder. Replace with actual logic if available in FileIndexerService.
+    // For now, return undefined.
+    return undefined;
+  }
+
+  // Stubs for missing methods
+  protected generateEmbeddings(_text: string): number[] {
+    throw new Error('generateEmbeddings not implemented');
+  }
+  protected extractContentByType(_metadata: FileMetadata, _content: string): { text: string; language: string } {
+    throw new Error('extractContentByType not implemented');
+  }
+  protected extractEntities(_text: string): string[] {
+    throw new Error('extractEntities not implemented');
+  }
+  protected extractKeywords(_text: string): string[] {
+    throw new Error('extractKeywords not implemented');
+  }
+  protected analyzeSentiment(_text: string): string {
+    throw new Error('analyzeSentiment not implemented');
+  }
+  protected calculateReadingTime(_text: string): number {
+    throw new Error('calculateReadingTime not implemented');
   }
 
   // Enhanced indexing with vector storage
@@ -123,7 +168,9 @@ class _FileIndexerService {
         metadata.readingTime = this.calculateReadingTime(extractionResult.text);
       }
     } catch (error) {
-      this.logger.warn(`Failed to enhance semantic data for ${metadata.path}: ${error}`, { component: 'VectorStore', action: 'enhanceSemanticData', metadata: { path: metadata.path } });
+      // Use a local logger instance for subclass-only methods
+      const logger = new EnterpriseLogger();
+      logger.warn(`Failed to enhance semantic data for ${metadata.path}: ${error}`, { component: 'VectorStore', action: 'enhanceSemanticData', metadata: { path: metadata.path } });
     }
   }
 }

@@ -32,10 +32,12 @@ const windowsReservedNames = [
 ];
 
 // Invalid characters for file/folder names
-const INVALID_NAME_CHARS = /[<>:"/\\|?*\x00-\x1f]/;
+// deno-lint-ignore no-control-regex
+const INVALID_NAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/;
 
 // Invalid characters for paths
-const INVALID_PATH_CHARS = /[\x00-\x1f]/;
+// deno-lint-ignore no-control-regex
+const INVALID_PATH_CHARS = /[\u0000-\u001f]/;
 
 /**
  * Validate a slug (URL-friendly identifier)
@@ -241,7 +243,7 @@ export function validateFilename(filename: string, options: ValidationOptions = 
 
   // Check for reserved names
   const baseName = filename.toUpperCase().split(".")[0];
-  if (windowsReservedNames.includes(baseName as any)) {
+  if (windowsReservedNames.includes(baseName as string)) {
     errors.push(`Filename cannot be a Windows reserved name: ${filename}`);
   }
 
@@ -349,7 +351,7 @@ export function validateUuid(uuid: string, options: ValidationOptions = {}): Val
  * @returns ValidationResult
  */
 export function validateRequired(
-  value: any, 
+  value: unknown, 
   fieldName: string, 
   options: ValidationOptions = {}
 ): ValidationResult {
@@ -527,7 +529,7 @@ export function validateFileNameApi(name: string): ApiValidationResult {
 
   // Check for reserved names (Windows) - including with extensions
   const baseName = name.toUpperCase().split(".")[0];
-  if (windowsReservedNames.includes(baseName as any)) {
+  if (windowsReservedNames.includes(baseName as string)) {
     return {
       valid: false,
       message: "Name is reserved by the system",

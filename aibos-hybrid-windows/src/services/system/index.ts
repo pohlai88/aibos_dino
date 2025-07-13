@@ -1,10 +1,10 @@
-import { SystemInfoService } from './system-info';
-import { PowerManagementService } from './power-management';
-import { CapabilitiesDetector } from './capabilities-detector';
-import { SystemInfo, SystemCapabilities, PowerState } from './types';
-import { EnterpriseLogger } from '../core/logger';
-import { EventThrottler } from '../core/event-throttler';
-import { PermissionManager } from '../core/permissions';
+import { SystemInfoService } from './system-info.ts';
+import { PowerManagementService } from './power-management.ts';
+import { CapabilitiesDetector } from './capabilities-detector.ts';
+import { SystemInfo, SystemCapabilities, PowerState } from './types.ts';
+import { EnterpriseLogger } from '../core/logger.ts';
+import { EventThrottler } from '../core/event-throttler.ts';
+import { PermissionManager } from '../core/permissions.ts';
 
 export class SystemService {
   private systemInfo: SystemInfoService;
@@ -82,6 +82,6 @@ export class SystemService {
 }
 
 // Export types for external use
-export * from './types';
-export { EnterpriseLogger } from '../core/logger';
-export { EventThrottler } from '../core/event-throttler';
+export * from './types.ts';
+export { EnterpriseLogger } from '../core/logger.ts';
+export { EventThrottler } from '../core/event-throttler.ts';

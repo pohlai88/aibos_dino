@@ -1,7 +1,7 @@
 import React from 'react';
 import { createAppSearchResult } from './searchRegistry.ts';
 import { useUIState } from '../store/uiState.ts';
-import { SearchProvider, SearchResult } from '../types/search.ts';
+import { SearchResult } from '../types/search.ts';
 import { monitorManager } from './monitorManager.ts';
 import { EnterpriseLogger } from './core/logger.ts';
 
@@ -162,12 +162,12 @@ class AppRegistryService {
         lastUpdated: app.metadata?.lastUpdated || new Date(),
         installDate: app.metadata?.installDate || new Date(),
         usageCount: app.metadata?.usageCount || 0,
-        website: app.metadata?.website,
-        repository: app.metadata?.repository,
-        license: app.metadata?.license,
-        dependencies: app.metadata?.dependencies,
-        rating: app.metadata?.rating,
-        size: app.metadata?.size
+        ...(app.metadata?.website !== undefined && { website: app.metadata.website }),
+        ...(app.metadata?.repository !== undefined && { repository: app.metadata.repository }),
+        ...(app.metadata?.license !== undefined && { license: app.metadata.license }),
+        ...(app.metadata?.dependencies !== undefined && { dependencies: app.metadata.dependencies }),
+        ...(app.metadata?.rating !== undefined && { rating: app.metadata.rating }),
+        ...(app.metadata?.size !== undefined && { size: app.metadata.size })
       },
       keywords: app.keywords || [],
       isSystem: app.isSystem || false,
@@ -504,9 +504,18 @@ export const searchApps = (query: string, options?: Parameters<typeof appRegistr
 class _AppRegistryProvider implements SearchProvider {
   private logger = new EnterpriseLogger();
   
-  // Replace all logging calls:
-  // logInfo('message') → this.logger.info('message', { component: 'AppRegistry', action: 'actionName' })
-  // logWarn('message') → this.logger.warn('message', { component: 'AppRegistry', action: 'actionName' })
-  // logError('message') → this.logger.error('message', { component: 'AppRegistry', action: 'actionName' })
-  // logSuccess('message') → this.logger.info('message', { component: 'AppRegistry', action: 'actionName', metadata: { status: 'success' } })
+  id = "app-registry";
+  name = "App Registry Provider";
+  description = "Search and manage applications";
+  priority = 5;
+  
+  search(query: string, _limit?: number): Promise<SearchResult[]> {
+    this.logger.info(`Searching apps for: ${query}`, { component: 'AppRegistry', action: 'search' });
+    return Promise.resolve([]);
+  }
+  
+  getQuickAccess(_limit?: number): Promise<SearchResult[]> {
+    this.logger.info(`Getting quick access apps`, { component: 'AppRegistry', action: 'getQuickAccess' });
+    return Promise.resolve([]);
+  }
 }

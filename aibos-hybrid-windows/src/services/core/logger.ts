@@ -1,3 +1,5 @@
+/// <reference lib="deno.ns" />
+
 export interface LogContext {
   component: string;
   action: string;
@@ -58,7 +60,7 @@ export class EnterpriseLogger implements Logger {
     }
   }
 
-  private async sendToMonitoring(level: string, message: string, context?: LogContext) {
+  private sendToMonitoring(level: string, message: string, context?: LogContext) {
     try {
       const errors = JSON.parse(localStorage.getItem('aibos-error-logs') || '[]');
       errors.push({ level, message, context, timestamp: new Date().toISOString() });

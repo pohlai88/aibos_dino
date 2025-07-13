@@ -1,7 +1,7 @@
 // /system-integration/file-system/associations.ts
 
-import { Logger } from '../logger';
-import { systemEvents } from '../systemEvents';
+import { Logger } from './core/logger.ts';
+import { systemEvents } from '../types/systemEvents.ts';
 
 export interface FileAssociation {
   extension: string;
@@ -43,11 +43,11 @@ export class FileAssociationService {
     { extension: '.html', mimeType: 'text/html', description: 'HTML Document' }
   ];
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     try {
-      await this.checkRegistrationStatus();
+      this.checkRegistrationStatus();
       if (!this.isRegistered) {
-        await this.registerFileAssociations();
+        this.registerFileAssociations();
       }
       this.logger.info('File associations initialized successfully', {
         component: 'FileAssociationService',
@@ -62,7 +62,7 @@ export class FileAssociationService {
     }
   }
 
-  private async checkRegistrationStatus(): Promise<void> {
+  private checkRegistrationStatus(): void {
     try {
       if ('launchQueue' in window && 'LaunchParams' in window) {
         this.isRegistered = true;
@@ -76,7 +76,7 @@ export class FileAssociationService {
     }
   }
 
-  async registerFileAssociations(): Promise<void> {
+  registerFileAssociations(): void {
     try {
       if ('serviceWorker' in navigator && 'launchQueue' in window) {
         this.logger.debug('Registering file associations with File Handling API', {
@@ -86,7 +86,7 @@ export class FileAssociationService {
         // You might implement registration logic here for File Handling API.
       }
 
-      await this.registerProtocolHandler();
+      this.registerProtocolHandler();
       this.isRegistered = true;
 
       this.logger.info('File associations registered successfully', {
@@ -135,13 +135,12 @@ if ('launchQueue' in self) {
 `;
   }
 
-  private async registerProtocolHandler(): Promise<void> {
+  private registerProtocolHandler(): void {
     try {
       if ('registerProtocolHandler' in navigator) {
         navigator.registerProtocolHandler(
           'aibos',
-          '/open-protocol?url=%s',
-          'AI-BOS Platform'
+          '/open-protocol?url=%s'
         );
         this.logger.info('Protocol handler registered', {
           component: 'FileAssociationService',
@@ -201,7 +200,7 @@ if ('launchQueue' in self) {
     return [...this.associations];
   }
 
-  async unregisterFileAssociations(): Promise<void> {
+  unregisterFileAssociations(): void {
     this.isRegistered = false;
     this.logger.info('File associations unregistered', {
       component: 'FileAssociationService',

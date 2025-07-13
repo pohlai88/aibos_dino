@@ -193,6 +193,8 @@ const WindowsContainer: React.FC = memo(() => {
         // For now, render the first window in the group as a placeholder
         // In a full implementation, this would be replaced with TabbedWindow component
         const firstWindow = groupWindows[0];
+        if (!firstWindow) return null;
+        
         const appInfo = appRegistry.get(firstWindow.component);
         if (!appInfo) return null;
 

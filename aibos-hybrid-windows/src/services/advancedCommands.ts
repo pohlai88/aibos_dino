@@ -7,7 +7,7 @@ export interface Command {
   description: string;
   shortcut?: string;
   category: 'window' | 'system' | 'productivity' | 'automation';
-  execute: (args?: any) => void | Promise<void>;
+  execute: (args?: Record<string, unknown>) => void | Promise<void>;
 }
 
 export interface CommandPalette {
@@ -35,7 +35,8 @@ class AdvancedCommandManager {
       shortcut: 'Ctrl+Shift+G',
       category: 'window',
       execute: () => {
-        (window as any).openGridLayoutManager?.();
+        const win = window as unknown as Record<string, unknown>;
+        (win['openGridLayoutManager'] as (() => void) | undefined)?.();
       }
     });
 
@@ -46,7 +47,8 @@ class AdvancedCommandManager {
       shortcut: 'Ctrl+Shift+W',
       category: 'window',
       execute: () => {
-        (window as any).openWindowGroupManager?.();
+        const win = window as unknown as Record<string, unknown>;
+        (win['openWindowGroupManager'] as (() => void) | undefined)?.();
       }
     });
 
@@ -143,7 +145,7 @@ class AdvancedCommandManager {
         const saved = localStorage.getItem('aibos-workspace');
         if (saved) {
           const workspace = JSON.parse(saved);
-          workspace.windows.forEach((win: any) => {
+          workspace.windows.forEach((win: { id: string; position: string }) => {
             const element = document.querySelector(`[data-window-id="${win.id}"]`);
             if (element) {
               (element as HTMLElement).style.transform = win.position;
@@ -199,7 +201,7 @@ class AdvancedCommandManager {
     return this.getAllCommands().filter(cmd => cmd.category === category);
   }
 
-  executeCommand(id: string, args?: any): void {
+  executeCommand(id: string, args?: Record<string, unknown>): void {
     const command = this.commands.get(id);
     if (command) {
       try {

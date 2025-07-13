@@ -1,0 +1,18 @@
+{
+  "timestamp": "2025-07-13T17:58:30.899Z",
+  "stats": {
+    "filesProcessed": 91,
+    "logsRemoved": 47,
+    "totalSize": 783730,
+    "startTime": 1752429510550,
+    "endTime": 1752429510899
+  },
+  "config": {
+    "inputDir": ".",
+    "outputDir": "dist",
+    "removeConsoleLogs": true,
+    "minify": true,
+    "sourceMaps": false
+  },
+  "duration": 0.349
+}

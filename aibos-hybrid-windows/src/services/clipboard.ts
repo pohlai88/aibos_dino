@@ -1,4 +1,4 @@
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 export class ClipboardService {
   private logger: EnterpriseLogger;
@@ -7,7 +7,7 @@ export class ClipboardService {
     this.logger = new EnterpriseLogger();
   }
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     this.logger.info('ClipboardService initialized', {
       component: 'ClipboardService',
       action: 'initialize'

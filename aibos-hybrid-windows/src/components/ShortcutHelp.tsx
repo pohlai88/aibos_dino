@@ -99,8 +99,8 @@ export const ShortcutHelp: React.FC<ShortcutHelpProps> = React.memo(({ isVisible
 
   // Scroll to top when search or category changes
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({
+    if (scrollContainerRef.current && typeof scrollContainerRef.current.scrollTo === 'function') {
+      (scrollContainerRef.current as HTMLElement).scrollTo({
         top: 0,
         behavior: 'smooth'
       });
@@ -144,12 +144,14 @@ export const ShortcutHelp: React.FC<ShortcutHelpProps> = React.memo(({ isVisible
             prev > 0 ? prev - 1 : shortcuts.length - 1
           );
           break;
-        case 'Enter':
+        case 'Enter': {
           event.preventDefault();
-          if (focusedIndex >= 0 && shortcuts[focusedIndex]) {
-            handleCopyShortcut(shortcuts[focusedIndex]);
+          const focusedShortcut = shortcuts[focusedIndex];
+          if (focusedIndex >= 0 && focusedShortcut) {
+            handleCopyShortcut(focusedShortcut);
           }
           break;
+        }
         case 'Tab':
           // Allow normal tab navigation within modal
           break;
@@ -236,6 +238,7 @@ export const ShortcutHelp: React.FC<ShortcutHelpProps> = React.memo(({ isVisible
               </div>
             </div>
             <button
+              type="button"
               onClick={onClose}
               className={`text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 ${
                 isMobile ? 'p-1' : 'p-2'
@@ -280,6 +283,7 @@ export const ShortcutHelp: React.FC<ShortcutHelpProps> = React.memo(({ isVisible
                   {categories.map((category) => (
                     <button
                       key={category}
+                      type="button"
                       onClick={() => setActiveCategory(category)}
                       role="tab"
                       aria-selected={activeCategory === category}
@@ -317,6 +321,7 @@ export const ShortcutHelp: React.FC<ShortcutHelpProps> = React.memo(({ isVisible
                 </p>
                 {searchQuery.trim() && (
                   <button
+                    type="button"
                     onClick={handleClearSearch}
                     className="mt-2 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                   >
@@ -408,6 +413,7 @@ export const ShortcutHelp: React.FC<ShortcutHelpProps> = React.memo(({ isVisible
                                 {highlightMatch(shortcut.key, searchQuery)}
                               </kbd>
                               <button
+                                type="button"
                                 onClick={() => handleCopyShortcut(shortcut)}
                                 className={`transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded ${
                                   copiedShortcutId === shortcut.id

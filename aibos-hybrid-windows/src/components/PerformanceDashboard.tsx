@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useUIState } from '../store/uiState.ts';
+import { useUIState as _useUIState } from '../store/uiState.ts';
 import { analyzeBundle } from '../utils/codeSplitting.ts';
 
 // Strong typing for all interfaces
@@ -21,7 +21,8 @@ interface PerformanceData {
 interface BundleStats {
   loadTime?: number;
   domContentLoaded?: number;
-  firstPaint?: number;
+  firstPaint?: number | undefined;
+  firstContentfulPaint?: number | undefined;
   totalSize?: number;
   chunkCount?: number;
 }
@@ -96,11 +97,11 @@ export const PerformanceDashboard: React.FC = () => {
       lastRenderTime.current = currentTime;
 
       const metrics: PerformanceMetrics = {
-        memoryUsage: (performance as any).memory?.usedJSHeapSize || 0,
+        memoryUsage: ((performance as unknown) as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize || 0,
         renderTime: renderDuration,
         bundleSize: bundleStats?.totalSize || 0,
         loadTime: (() => {
-          const timing = (performance as any).timing;
+          const timing = ((performance as unknown) as { timing?: { loadEventEnd: number; navigationStart: number } }).timing;
           if (timing?.loadEventEnd && timing?.navigationStart) {
             return timing.loadEventEnd - timing.navigationStart;
           }
@@ -226,6 +227,7 @@ export const PerformanceDashboard: React.FC = () => {
   if (!isVisible) {
     return (
       <button
+        type="button"
         onClick={() => setIsVisible(true)}
         className="fixed bottom-4 right-4 z-50 bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
         title="Performance Dashboard"
@@ -261,6 +263,7 @@ export const PerformanceDashboard: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             <button
+              type="button"
               onClick={handleExportData}
               className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
               title="Export performance data"
@@ -269,6 +272,7 @@ export const PerformanceDashboard: React.FC = () => {
               📥 Export
             </button>
             <button
+              type="button"
               onClick={() => setIsMonitoring(!isMonitoring)}
               className={`px-3 py-1 rounded text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 isMonitoring 
@@ -280,6 +284,7 @@ export const PerformanceDashboard: React.FC = () => {
               {isMonitoring ? '⏹️ Stop' : '▶️ Start'} Monitoring
             </button>
             <button
+              type="button"
               onClick={() => setIsVisible(false)}
               className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-red-500"
               aria-label="Close performance dashboard"
@@ -412,17 +417,17 @@ export const PerformanceDashboard: React.FC = () => {
                   <div>Platform: {navigator.platform}</div>
                   <div>Language: {navigator.language}</div>
                   <div>Online: {navigator.onLine ? 'Yes' : 'No'}</div>
-                  <div>Connection: {(navigator as any).connection?.effectiveType || 'Unknown'}</div>
+                  <div>Connection: {((navigator as unknown) as { connection?: { effectiveType?: string } }).connection?.effectiveType || 'Unknown'}</div>
                 </div>
               </div>
               
               <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
                 <h4 className="font-medium mb-2 text-gray-900 dark:text-white">Memory</h4>
                 <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                  <div>Memory Limit: {(performance as any).memory ? formatMemorySize((performance as any).memory.jsHeapSizeLimit) : 'N/A'}</div>
-                  <div>Total Memory: {(performance as any).memory ? formatMemorySize((performance as any).memory.totalJSHeapSize) : 'N/A'}</div>
-                  <div>Used Memory: {(performance as any).memory ? formatMemorySize((performance as any).memory.usedJSHeapSize) : 'N/A'}</div>
-                  <div>Available: {(performance as any).memory ? formatMemorySize((performance as any).memory.jsHeapSizeLimit - (performance as any).memory.usedJSHeapSize) : 'N/A'}</div>
+                  <div>Memory Limit: {((performance as unknown) as { memory?: { jsHeapSizeLimit: number; totalJSHeapSize: number; usedJSHeapSize: number } }).memory ? formatMemorySize(((performance as unknown) as { memory: { jsHeapSizeLimit: number } }).memory.jsHeapSizeLimit) : 'N/A'}</div>
+                  <div>Total Memory: {((performance as unknown) as { memory?: { jsHeapSizeLimit: number; totalJSHeapSize: number; usedJSHeapSize: number } }).memory ? formatMemorySize(((performance as unknown) as { memory: { totalJSHeapSize: number } }).memory.totalJSHeapSize) : 'N/A'}</div>
+                  <div>Used Memory: {((performance as unknown) as { memory?: { jsHeapSizeLimit: number; totalJSHeapSize: number; usedJSHeapSize: number } }).memory ? formatMemorySize(((performance as unknown) as { memory: { usedJSHeapSize: number } }).memory.usedJSHeapSize) : 'N/A'}</div>
+                  <div>Available: {((performance as unknown) as { memory?: { jsHeapSizeLimit: number; usedJSHeapSize: number } }).memory ? formatMemorySize(((performance as unknown) as { memory: { jsHeapSizeLimit: number; usedJSHeapSize: number } }).memory.jsHeapSizeLimit - ((performance as unknown) as { memory: { usedJSHeapSize: number } }).memory.usedJSHeapSize) : 'N/A'}</div>
                 </div>
               </div>
             </div>

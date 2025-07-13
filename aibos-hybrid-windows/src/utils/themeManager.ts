@@ -221,7 +221,11 @@ export const getNextTheme = (currentTheme: ThemeVariant): ThemeVariant => {
   const order = getThemeOrder();
   const currentIndex = order.indexOf(currentTheme);
   const nextIndex = (currentIndex + 1) % order.length;
-  return order[nextIndex];
+  const nextTheme = order[nextIndex];
+  if (!nextTheme) {
+    return 'nebula'; // fallback
+  }
+  return nextTheme;
 };
 
 // Get previous theme in cycle
@@ -229,7 +233,11 @@ export const getPreviousTheme = (currentTheme: ThemeVariant): ThemeVariant => {
   const order = getThemeOrder();
   const currentIndex = order.indexOf(currentTheme);
   const prevIndex = currentIndex === 0 ? order.length - 1 : currentIndex - 1;
-  return order[prevIndex];
+  const prevTheme = order[prevIndex];
+  if (!prevTheme) {
+    return 'nebula'; // fallback
+  }
+  return prevTheme;
 };
 
 // Apply theme to CSS custom properties

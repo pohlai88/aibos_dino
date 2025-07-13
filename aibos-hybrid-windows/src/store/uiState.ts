@@ -1,8 +1,7 @@
-import { create } from 'zustand';
-import { ThemeVariant, getThemeOrder } from '../utils/themeManager.ts';
+import { create } from 'https://esm.sh/zustand@4.4.7';
+import { getThemeOrder, type ThemeVariant } from '../utils/themeManager.ts';
 import type { ThemeMode } from '../utils/themeHelpers.ts';
 
-// --- Types ---
 interface WindowState {
   id: string;
   component: string;
@@ -37,10 +36,10 @@ interface Notification {
 interface UIState {
   // Window management
   openWindows: WindowState[];
-  focusedWindowId?: string;
+  focusedWindowId: string | null;
   // Window Groups & Tabs
   windowGroups: Record<string, WindowGroup>;
-  activeGroupId?: string;
+  activeGroupId: string | null;
   // UI overlays
   spotlightVisible: boolean;
   startMenuVisible: boolean;
@@ -104,7 +103,9 @@ interface UIState {
   navigateHome: () => void;
 }
 
-export const useUIState = create<UIState>((set) => {
+export type { WindowState, WindowGroup };
+
+export const useUIState = create<UIState>((set, get) => {
   // --- Theme ---
   const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('aibos-theme') as ThemeVariant : 'nebula';
   const initialTheme = savedTheme || 'nebula';
@@ -113,9 +114,9 @@ export const useUIState = create<UIState>((set) => {
   return {
     // --- State ---
     openWindows: [],
-    focusedWindowId: undefined,
+    focusedWindowId: null,
     windowGroups: {},
-    activeGroupId: undefined,
+    activeGroupId: null,
     spotlightVisible: false,
     startMenuVisible: false,
     userMenuVisible: false,
@@ -128,124 +129,148 @@ export const useUIState = create<UIState>((set) => {
     notifications: [],
 
     // --- Window Actions ---
-    openWindow: (component, props) => set((state) => {
-      const maxZIndex = Math.max(...state.openWindows.map(win => win.zIndex), 0);
+    openWindow: (component: string, props?: Record<string, unknown>) => set((state: UIState) => {
+      const maxZIndex = Math.max(...state.openWindows.map((win: WindowState) => win.zIndex), 0);
       const newId = `${component}-${Date.now()}`;
       const newWindow: WindowState = {
         id: newId,
         component,
-        props,
         zIndex: maxZIndex + 1,
         minimized: false,
         maximized: false,
         focused: true,
       };
+      
+      // Only add props if provided
+      if (props) {
+        newWindow.props = props;
+      }
+      
       // Unfocus all others
-      const openWindows = state.openWindows.map(win => ({ ...win, focused: false }));
+      const openWindows = state.openWindows.map((win: WindowState) => ({ ...win, focused: false }));
       return {
         openWindows: [...openWindows, newWindow],
         focusedWindowId: newId,
       };
     }),
-    closeWindow: (id) => set((state) => {
-      const openWindows = state.openWindows.filter(win => win.id !== id);
+    closeWindow: (id: string) => set((state: UIState) => {
+      const openWindows = state.openWindows.filter((win: WindowState) => win.id !== id);
       let focusedWindowId = state.focusedWindowId;
       if (focusedWindowId === id) {
-        focusedWindowId = openWindows.length > 0 ? openWindows[openWindows.length - 1].id : undefined;
+        focusedWindowId = openWindows.length > 0 ? openWindows[openWindows.length - 1]?.id || null : null;
       }
-      return { openWindows, focusedWindowId };
+      
+      const result: Partial<UIState> = { openWindows };
+      if (focusedWindowId !== null) {
+        result.focusedWindowId = focusedWindowId;
+      }
+      return result;
     }),
-    bringToFront: (id) => set((state) => {
-      const maxZIndex = Math.max(...state.openWindows.map(win => win.zIndex), 0);
+    bringToFront: (id: string) => set((state: UIState) => {
+      const maxZIndex = Math.max(...state.openWindows.map((win: WindowState) => win.zIndex), 0);
       return {
-        openWindows: state.openWindows.map(win =>
+        openWindows: state.openWindows.map((win: WindowState) =>
           win.id === id ? { ...win, zIndex: maxZIndex + 1, focused: true } : { ...win, focused: false }
         ),
         focusedWindowId: id,
       };
     }),
-    bringWindowToFront: (component) => set((state) => {
-      const maxZIndex = Math.max(...state.openWindows.map(win => win.zIndex), 0);
-      let focusedId = state.focusedWindowId;
-      const openWindows = state.openWindows.map(win => {
+    bringWindowToFront: (component: string) => set((state: UIState) => {
+      const maxZIndex = Math.max(...state.openWindows.map((win: WindowState) => win.zIndex), 0);
+      let focusedId: string | null = state.focusedWindowId;
+      const openWindows = state.openWindows.map((win: WindowState) => {
         if (win.component === component) {
           focusedId = win.id;
           return { ...win, zIndex: maxZIndex + 1, focused: true };
         }
         return { ...win, focused: false };
       });
-      return { openWindows, focusedWindowId: focusedId };
+      
+      const result: Partial<UIState> = { openWindows };
+      if (focusedId !== null) {
+        result.focusedWindowId = focusedId;
+      }
+      return result;
     }),
-    minimizeWindow: (id) => set((state) => ({
-      openWindows: state.openWindows.map(win =>
-        win.id === id ? { ...win, minimized: true, maximized: false, focused: false } : win
-      ),
-      focusedWindowId: state.focusedWindowId === id ? undefined : state.focusedWindowId,
-    })),
-    maximizeWindow: (id) => set((state) => ({
-      openWindows: state.openWindows.map(win =>
+    minimizeWindow: (id: string) => set((state: UIState) => {
+      const result: Partial<UIState> = {
+        openWindows: state.openWindows.map((win: WindowState) =>
+          win.id === id ? { ...win, minimized: true, maximized: false, focused: false } : win
+        ),
+      };
+      
+      if (state.focusedWindowId === id) {
+        // Don't assign null, just omit the property
+      } else if (state.focusedWindowId !== null) {
+        result.focusedWindowId = state.focusedWindowId;
+      }
+      
+      return result;
+    }),
+    maximizeWindow: (id: string) => set((state: UIState) => ({
+      openWindows: state.openWindows.map((win: WindowState) =>
         win.id === id ? { ...win, maximized: true, minimized: false, focused: true } : { ...win, focused: false }
       ),
       focusedWindowId: id,
     })),
-    restoreWindow: (id) => set((state) => ({
-      openWindows: state.openWindows.map(win =>
+    restoreWindow: (id: string) => set((state: UIState) => ({
+      openWindows: state.openWindows.map((win: WindowState) =>
         win.id === id ? { ...win, minimized: false, maximized: false, focused: true } : { ...win, focused: false }
       ),
       focusedWindowId: id,
     })),
-    closeAllWindows: () => set(() => ({ openWindows: [], focusedWindowId: undefined })),
-    focusWindow: (id) => set((state) => ({
-      openWindows: state.openWindows.map(win =>
+    closeAllWindows: () => set(() => ({ openWindows: [] })),
+    focusWindow: (id: string) => set((state: UIState) => ({
+      openWindows: state.openWindows.map((win: WindowState) =>
         win.id === id ? { ...win, focused: true } : { ...win, focused: false }
       ),
       focusedWindowId: id,
     })),
 
     // --- Overlay Actions ---
-    toggleStartMenu: () => set((state) => ({ startMenuVisible: !state.startMenuVisible })),
+    toggleStartMenu: () => set((state: UIState) => ({ startMenuVisible: !state.startMenuVisible })),
     openStartMenu: () => set({ startMenuVisible: true }),
     closeStartMenu: () => set({ startMenuVisible: false }),
-    toggleSpotlight: () => set((state) => ({ spotlightVisible: !state.spotlightVisible })),
+    toggleSpotlight: () => set((state: UIState) => ({ spotlightVisible: !state.spotlightVisible })),
     openSpotlight: () => set({ spotlightVisible: true }),
     closeSpotlight: () => set({ spotlightVisible: false }),
-    toggleUserMenu: () => set((state) => ({ userMenuVisible: !state.userMenuVisible })),
+    toggleUserMenu: () => set((state: UIState) => ({ userMenuVisible: !state.userMenuVisible })),
     openUserMenu: () => set({ userMenuVisible: true }),
     closeUserMenu: () => set({ userMenuVisible: false }),
-    toggleShortcutHelp: () => set((state) => ({ shortcutHelpVisible: !state.shortcutHelpVisible })),
+    toggleShortcutHelp: () => set((state: UIState) => ({ shortcutHelpVisible: !state.shortcutHelpVisible })),
     openShortcutHelp: () => set({ shortcutHelpVisible: true }),
     closeShortcutHelp: () => set({ shortcutHelpVisible: false }),
 
     // --- Theme & Accessibility ---
-    setTheme: (theme) => {
+    setTheme: (theme: ThemeVariant) => {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aibos-theme', theme);
       }
       set({ theme });
     },
-    setColorMode: (colorMode) => {
+    setColorMode: (colorMode: ThemeMode) => {
       if (typeof window !== 'undefined') {
         localStorage.setItem('aibos-color-mode', colorMode);
       }
       set({ colorMode });
     },
-    cycleTheme: () => set((state) => {
+    cycleTheme: () => set((state: UIState) => {
       const currentIndex = themeOrder.indexOf(state.theme);
       const nextIndex = (currentIndex + 1) % themeOrder.length;
       const newTheme = themeOrder[nextIndex];
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && newTheme) {
         localStorage.setItem('aibos-theme', newTheme);
       }
-      return { theme: newTheme };
+      return { theme: newTheme || 'nebula' };
     }),
-    toggleHighContrast: () => set((state) => ({ highContrastMode: !state.highContrastMode })),
+    toggleHighContrast: () => set((state: UIState) => ({ highContrastMode: !state.highContrastMode })),
 
     // --- Spotlight/Search ---
-    setLastSpotlightQuery: (query) => set({ lastSpotlightQuery: query }),
-    setLastSpotlightResults: (results) => set({ lastSpotlightResults: results }),
+    setLastSpotlightQuery: (query: string) => set({ lastSpotlightQuery: query }),
+    setLastSpotlightResults: (results: unknown[]) => set({ lastSpotlightResults: results }),
 
     // --- Notifications ---
-    addNotification: (type, message) => set((state) => {
+    addNotification: (type: Notification['type'], message: string) => set((state: UIState) => {
       const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const notification: Notification = {
         id,
@@ -255,33 +280,41 @@ export const useUIState = create<UIState>((set) => {
       };
       return { notifications: [...state.notifications, notification] };
     }),
-    removeNotification: (id) => set((state) => ({
-      notifications: state.notifications.filter(n => n.id !== id)
+    removeNotification: (id: string) => set((state: UIState) => ({
+      notifications: state.notifications.filter((n: Notification) => n.id !== id)
     })),
     clearNotifications: () => set({ notifications: [] }),
 
     // --- Window Groups & Tabs Actions ---
-    createWindowGroup: (name, windowIds = []) => {
+    createWindowGroup: (name: string, windowIds: string[] = []) => {
       const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const group: WindowGroup = {
         id: groupId,
         name,
         windowIds,
-        activeWindowId: windowIds[0],
         isCollapsed: false,
-        order: Object.keys(useUIState.getState().windowGroups).length,
+        order: Object.keys(get().windowGroups).length,
       };
-      set((state) => ({
+      
+      // Only add activeWindowId if there are windows
+      if (windowIds.length > 0) {
+        const firstWindowId = windowIds[0];
+        if (firstWindowId) {
+          group.activeWindowId = firstWindowId;
+        }
+      }
+      
+      set((state: UIState) => ({
         windowGroups: { ...state.windowGroups, [groupId]: group },
         activeGroupId: groupId,
       }));
       return groupId;
     },
-    addWindowToGroup: (windowId, groupId) => set((state) => {
+    addWindowToGroup: (windowId: string, groupId: string) => set((state: UIState) => {
       const group = state.windowGroups[groupId];
       if (!group) return {};
       
-      const updatedGroup = {
+      const updatedGroup: WindowGroup = {
         ...group,
         windowIds: [...group.windowIds, windowId],
         activeWindowId: windowId,
@@ -289,95 +322,129 @@ export const useUIState = create<UIState>((set) => {
       
       return {
         windowGroups: { ...state.windowGroups, [groupId]: updatedGroup },
-        openWindows: state.openWindows.map(win =>
+        openWindows: state.openWindows.map((win: WindowState) =>
           win.id === windowId ? { ...win, groupId } : win
         ),
       };
     }),
-    removeWindowFromGroup: (windowId) => set((state) => {
+    removeWindowFromGroup: (windowId: string) => set((state: UIState) => {
       const updatedGroups = { ...state.windowGroups };
       let updatedWindows = state.openWindows;
       
       // Find and remove window from its group
       Object.keys(updatedGroups).forEach(groupId => {
         const group = updatedGroups[groupId];
-        if (group.windowIds.includes(windowId)) {
-          const newWindowIds = group.windowIds.filter(id => id !== windowId);
+        if (group && group.windowIds.includes(windowId)) {
+          const newWindowIds = group.windowIds.filter((id: string) => id !== windowId);
           if (newWindowIds.length === 0) {
             delete updatedGroups[groupId];
           } else {
-            updatedGroups[groupId] = {
+            const updatedGroup: WindowGroup = {
               ...group,
               windowIds: newWindowIds,
-              activeWindowId: group.activeWindowId === windowId ? newWindowIds[0] : group.activeWindowId,
             };
+            
+            if (group.activeWindowId === windowId) {
+              const firstWindowId = newWindowIds[0];
+              if (firstWindowId) {
+                updatedGroup.activeWindowId = firstWindowId;
+              }
+            } else if (group.activeWindowId !== undefined) {
+              updatedGroup.activeWindowId = group.activeWindowId;
+            }
+            
+            updatedGroups[groupId] = updatedGroup;
           }
-          updatedWindows = updatedWindows.map(win =>
-            win.id === windowId ? { ...win, groupId: undefined } : win
-          );
+          updatedWindows = updatedWindows.map((win: WindowState) => {
+            if (win.id === windowId) {
+              const { groupId: _, ...rest } = win;
+              return rest;
+            }
+            return win;
+          });
         }
       });
       
       return { windowGroups: updatedGroups, openWindows: updatedWindows };
     }),
-    setActiveGroup: (groupId) => set({ activeGroupId: groupId }),
-    setActiveWindowInGroup: (groupId, windowId) => set((state) => {
+    setActiveGroup: (groupId: string) => set({ activeGroupId: groupId }),
+    setActiveWindowInGroup: (groupId: string, windowId: string) => set((state: UIState) => {
       const group = state.windowGroups[groupId];
       if (!group || !group.windowIds.includes(windowId)) return {};
+      
+      const updatedGroup: WindowGroup = {
+        ...group,
+        activeWindowId: windowId,
+      };
       
       return {
         windowGroups: {
           ...state.windowGroups,
-          [groupId]: { ...group, activeWindowId: windowId }
+          [groupId]: updatedGroup
         },
-        openWindows: state.openWindows.map(win =>
+        openWindows: state.openWindows.map((win: WindowState) =>
           win.id === windowId ? { ...win, focused: true } : { ...win, focused: false }
         ),
         focusedWindowId: windowId,
       };
     }),
-    collapseGroup: (groupId) => set((state) => {
+    collapseGroup: (groupId: string) => set((state: UIState) => {
       const group = state.windowGroups[groupId];
       if (!group) return {};
+      
+      const updatedGroup: WindowGroup = {
+        ...group,
+        isCollapsed: true
+      };
       
       return {
         windowGroups: {
           ...state.windowGroups,
-          [groupId]: { ...group, isCollapsed: true }
+          [groupId]: updatedGroup
         },
-        openWindows: state.openWindows.map(win =>
+        openWindows: state.openWindows.map((win: WindowState) =>
           group.windowIds.includes(win.id) ? { ...win, minimized: true } : win
         ),
       };
     }),
-    expandGroup: (groupId) => set((state) => {
+    expandGroup: (groupId: string) => set((state: UIState) => {
       const group = state.windowGroups[groupId];
       if (!group) return {};
+      
+      const updatedGroup: WindowGroup = {
+        ...group,
+        isCollapsed: false
+      };
       
       return {
         windowGroups: {
           ...state.windowGroups,
-          [groupId]: { ...group, isCollapsed: false }
+          [groupId]: updatedGroup
         },
-        openWindows: state.openWindows.map(win =>
+        openWindows: state.openWindows.map((win: WindowState) =>
           group.windowIds.includes(win.id) ? { ...win, minimized: false } : win
         ),
       };
     }),
-    closeGroup: (groupId) => set((state) => {
+    closeGroup: (groupId: string) => set((state: UIState) => {
       const group = state.windowGroups[groupId];
       if (!group) return {};
       
       const updatedGroups = { ...state.windowGroups };
       delete updatedGroups[groupId];
       
-      return {
+      const result: Partial<UIState> = {
         windowGroups: updatedGroups,
-        openWindows: state.openWindows.filter(win => !group.windowIds.includes(win.id)),
-        focusedWindowId: state.focusedWindowId && group.windowIds.includes(state.focusedWindowId) 
-          ? undefined 
-          : state.focusedWindowId,
+        openWindows: state.openWindows.filter((win: WindowState) => !group.windowIds.includes(win.id)),
       };
+      
+      if (state.focusedWindowId && group.windowIds.includes(state.focusedWindowId)) {
+        // Don't assign null, just omit the property
+      } else if (state.focusedWindowId !== null) {
+        result.focusedWindowId = state.focusedWindowId;
+      }
+      
+      return result;
     }),
 
     // --- Navigation ---
@@ -385,7 +452,6 @@ export const useUIState = create<UIState>((set) => {
       // Example: close all windows, reset overlays
       set({
         openWindows: [],
-        focusedWindowId: undefined,
         startMenuVisible: false,
         userMenuVisible: false,
         shortcutHelpVisible: false,

@@ -7,7 +7,7 @@
  */
 
 import { walk } from 'https://deno.land/std@0.208.0/fs/mod.ts';
-import { join, extname, relative } from 'https://deno.land/std@0.208.0/path/mod.ts';
+import { extname, relative } from 'https://deno.land/std@0.208.0/path/mod.ts';
 import { writeJsonFile } from '../modules/filesystem.ts';
 import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
 
@@ -200,7 +200,7 @@ async function main() {
   const bundlePath = Deno.args[0] || '.';
   
   try {
-    const stats = await analyzer.analyzeBundle(bundlePath);
+    await analyzer.analyzeBundle(bundlePath);
     await analyzer.generateJsonReport('bundle-analysis.json');
     logSuccess('Bundle analysis completed successfully!');
   } catch (error) {

@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState as _useState, useEffect as _useEffect, useRef as _useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUIState } from '../store/uiState.ts';
 import { getColor } from '../utils/themeHelpers.ts';
 import { useDeviceInfo } from '../utils/responsive.ts';
+import type { WindowState } from '../store/uiState.ts';
 
 interface TabbedWindowProps {
   groupId: string;
@@ -12,17 +13,17 @@ interface TabbedWindowProps {
 export const TabbedWindow: React.FC<TabbedWindowProps> = ({ groupId, onClose }) => {
   const { colorMode, windowGroups, openWindows, setActiveWindowInGroup, closeWindow } = useUIState();
   const deviceInfo = useDeviceInfo();
-  const { isMobile, isTablet } = deviceInfo;
+  const { isMobile, isTablet: _isTablet } = deviceInfo;
   
   const group = windowGroups[groupId];
-  const groupWindows = useMemo(() => {
+  const groupWindows = useMemo<WindowState[]>(() => {
     if (!group) return [];
-    return openWindows.filter(win => group.windowIds.includes(win.id));
+    return openWindows.filter((win: WindowState) => group.windowIds.includes(win.id));
   }, [group, openWindows]);
 
-  const activeWindow = useMemo(() => {
+  const activeWindow = useMemo<WindowState | null>(() => {
     if (!group || !group.activeWindowId) return null;
-    return openWindows.find(win => win.id === group.activeWindowId);
+    return openWindows.find((win: WindowState) => win.id === group.activeWindowId) || null;
   }, [group, openWindows]);
 
   const handleTabClick = useCallback((windowId: string) => {
@@ -67,7 +68,7 @@ export const TabbedWindow: React.FC<TabbedWindowProps> = ({ groupId, onClose }) 
         {/* Tabs */}
         <div className="flex-1 flex overflow-x-auto">
           <AnimatePresence mode="wait">
-            {groupWindows.map((window) => (
+            {groupWindows.map((window: WindowState) => (
               <motion.div
                 key={window.id}
                 initial={{ opacity: 0, x: -20 }}
@@ -106,7 +107,7 @@ export const TabbedWindow: React.FC<TabbedWindowProps> = ({ groupId, onClose }) 
                 {/* Close Button */}
                 <button
                   type="button"
-                  onClick={(e) => handleTabClose(window.id, e)}
+                  onClick={(e: React.MouseEvent) => handleTabClose(window.id, e)}
                   className={`
                     ml-2 p-1 rounded hover:bg-gray-600 transition-colors
                     ${isMobile ? 'w-6 h-6' : 'w-5 h-5'}

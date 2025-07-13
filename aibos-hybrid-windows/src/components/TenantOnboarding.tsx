@@ -4,7 +4,7 @@ import { getColor } from '../utils/themeHelpers.ts';
 import { useUIState } from '../store/uiState.ts';
 import { animation } from '../utils/designTokens.ts';
 
-interface TenantOnboardingProps {
+export interface TenantOnboardingProps {
   onTenantCreated?: (tenant: Tenant) => void;
   onSkip?: () => void;
   onComplete?: () => void;
@@ -217,6 +217,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
             </p>
             <div className="space-y-4">
               <button
+                type="button"
                 onClick={() => setStep(2)}
                 style={themeStyles.button.primary}
                 className="px-8 py-3 rounded-lg hover:bg-opacity-80 transition-colors"
@@ -226,6 +227,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
               {onSkip && (
                 <div>
                   <button
+                    type="button"
                     onClick={onSkip}
                     className="underline"
                     style={{ color: getColor('gray.500', colorMode) }}
@@ -397,6 +399,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
 
             <div className="flex justify-between mt-8">
               <button
+                type="button"
                 onClick={() => setStep(1)}
                 className="px-6 py-2 hover:underline"
                 style={{ color: getColor('gray.600', colorMode) }}
@@ -404,6 +407,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
                 ← Back
               </button>
               <button
+                type="button"
                 onClick={() => setStep(3)}
                 style={themeStyles.button.primary}
                 className="px-6 py-2 rounded-lg hover:bg-opacity-80 transition-colors"
@@ -579,6 +583,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
 
             <div className="flex justify-between">
               <button
+                type="button"
                 onClick={() => setStep(2)}
                 className="px-6 py-2 hover:underline"
                 style={{ color: getColor('gray.600', colorMode) }}
@@ -586,6 +591,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
                 ← Back
               </button>
               <button
+                type="button"
                 onClick={createTenant}
                 disabled={loading}
                 style={loading ? themeStyles.button.secondary : themeStyles.button.primary}
@@ -645,6 +651,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
 
             <div className="space-y-4">
               <button
+                type="button"
                 onClick={onComplete}
                 style={themeStyles.button.primary}
                 className="px-8 py-3 rounded-lg hover:bg-opacity-80 transition-colors"
@@ -653,6 +660,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
               </button>
               <div>
                 <button
+                  type="button"
                   onClick={() => setStep(1)}
                   className="underline"
                   style={{ color: getColor('gray.500', colorMode) }}
@@ -747,6 +755,7 @@ const TenantOnboarding: React.FC<TenantOnboardingProps> = ({
               </p>
             </div>
             <button
+              type="button"
               onClick={() => setError(null)}
               className="ml-auto text-sm hover:underline"
               style={{ color: getColor('error.600', colorMode) }}

@@ -1,4 +1,4 @@
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 export class FileSystemService {
   private logger: EnterpriseLogger;
@@ -7,7 +7,7 @@ export class FileSystemService {
     this.logger = new EnterpriseLogger();
   }
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     this.logger.info('FileSystemService initialized', {
       component: 'FileSystemService',
       action: 'initialize'

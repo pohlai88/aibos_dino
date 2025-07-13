@@ -18,6 +18,20 @@ export interface MonitorInfo {
   name?: string;
 }
 
+// Extended Screen interface for multi-monitor support
+interface ExtendedScreen {
+  left?: number;
+  top?: number;
+  width: number;
+  height: number;
+  devicePixelRatio?: number;
+  isPrimary?: boolean;
+  label?: string;
+  orientation?: ScreenOrientation;
+  availWidth?: number;
+  availHeight?: number;
+}
+
 // Window assignment type
 export interface WindowMonitorAssignment {
   windowId: string;
@@ -87,36 +101,57 @@ class MonitorManager {
       if (typeof window !== 'undefined' && 'getScreenDetails' in window) {
         // Experimental: Multi-Screen Window Placement API
         const details = await (globalThis as typeof globalThis & { getScreenDetails?: () => Promise<{ screens: Screen[] }> }).getScreenDetails?.();
-        this.monitors = details.screens.map((screen: Record<string, unknown>, _idx: number) => ({
+        
+        if (details?.screens) {
+          this.monitors = details.screens.map((screen: ExtendedScreen, _idx: number) => {
+            const baseInfo = {
+              id: this.generateMonitorId(screen),
+              bounds: {
+                x: screen.left ?? 0,
+                y: screen.top ?? 0,
+                width: screen.width,
+                height: screen.height,
+              },
+              dpi: this.getPhysicalDPI(screen),
+              scaleFactor: screen.devicePixelRatio || globalThis.devicePixelRatio || 1,
+              isPrimary: screen.isPrimary ?? false,
+              orientation: this.detectOrientation(screen),
+            };
+            
+            return screen.label 
+              ? { ...baseInfo, name: screen.label } as MonitorInfo
+              : baseInfo as MonitorInfo;
+          });
+        }
+      } else if (typeof window !== 'undefined' && globalThis.screen) {
+        // Fallback: single screen
+        const screen: ExtendedScreen = {
+          width: globalThis.screen.width,
+          height: globalThis.screen.height,
+          devicePixelRatio: globalThis.devicePixelRatio,
+          isPrimary: true,
+          label: 'Primary Display',
+        };
+        
+        const baseInfo = {
           id: this.generateMonitorId(screen),
           bounds: {
-            x: screen.left,
-            y: screen.top,
+            x: 0,
+            y: 0,
             width: screen.width,
             height: screen.height,
           },
           dpi: this.getPhysicalDPI(screen),
-          scaleFactor: screen.devicePixelRatio || globalThis.devicePixelRatio || 1,
-          isPrimary: !!screen.isPrimary,
-          orientation: this.detectOrientation(screen),
-          name: screen.label || undefined,
-        }));
-      } else if (typeof window !== 'undefined' && globalThis.screen) {
-        // Fallback: single screen
-        this.monitors = [{
-          id: this.generateMonitorId(globalThis.screen),
-          bounds: {
-            x: 0,
-            y: 0,
-            width: globalThis.screen.width,
-            height: globalThis.screen.height,
-          },
-          dpi: this.getPhysicalDPI(globalThis.screen),
-          scaleFactor: globalThis.devicePixelRatio || 1,
+          scaleFactor: screen.devicePixelRatio || 1,
           isPrimary: true,
-          orientation: this.detectOrientation(globalThis.screen),
-          name: 'Primary Display',
-        }];
+          orientation: this.detectOrientation(screen),
+        };
+        
+        const monitorInfo = screen.label 
+          ? { ...baseInfo, name: screen.label } as MonitorInfo
+          : baseInfo as MonitorInfo;
+        
+        this.monitors = [monitorInfo];
       } else {
         // Deno/Node: TODO - implement using Deno APIs if/when available
         this.monitors = [{
@@ -162,14 +197,14 @@ class MonitorManager {
   /**
    * Generate unique monitor ID based on bounds
    */
-  private generateMonitorId(screen: Record<string, unknown>): string {
+  private generateMonitorId(screen: ExtendedScreen): string {
     return `monitor-${screen.width}x${screen.height}-${Date.now()}`;
   }
 
   /**
    * Get physical DPI (separate from scale factor)
    */
-  private getPhysicalDPI(screen: Record<string, unknown>): number {
+  private getPhysicalDPI(screen: ExtendedScreen): number {
     // Try to get actual physical DPI if available
     if (screen.devicePixelRatio && screen.width && screen.height) {
       // Estimate based on common DPI values and screen size
@@ -183,7 +218,7 @@ class MonitorManager {
   /**
    * Detect screen orientation with fallback
    */
-  private detectOrientation(screen: Record<string, unknown>): 'landscape' | 'portrait' {
+  private detectOrientation(screen: ExtendedScreen): 'landscape' | 'portrait' {
     // Try modern API first
     if (screen.orientation?.type?.includes('portrait')) {
       return 'portrait';
@@ -193,8 +228,8 @@ class MonitorManager {
     }
     
     // Fallback to ratio-based detection with square monitor handling
-    const width = screen.width || screen.availWidth || 1920;
-    const height = screen.height || screen.availHeight || 1080;
+    const width = screen.width;
+    const height = screen.height;
     return height === width ? 'landscape' : (height > width ? 'portrait' : 'landscape');
   }
 
@@ -298,11 +333,6 @@ class MonitorManager {
       globalThis.addEventListener('screenschange', () => {
         this.detectMonitors();
       });
-    } else if (typeof window !== 'undefined' && 'onscreenschange' in window) {
-      // Fallback for older browsers
-      (globalThis as typeof globalThis & { oncreenschange?: () => void }).onscreenschange = () => {
-        this.detectMonitors();
-      };
     }
   }
 
@@ -310,7 +340,14 @@ class MonitorManager {
    * Get all monitors (immutable copy, with custom names)
    */
   getMonitors(): MonitorInfo[] {
-    return this.monitors.map(m => ({ ...m, name: this.getMonitorName(m.id) || m.name }));
+    return this.monitors.map(m => {
+      const customName = this.getMonitorName(m.id);
+      const finalName = customName || m.name;
+      
+      return finalName 
+        ? { ...m, name: finalName } as MonitorInfo
+        : { ...m } as MonitorInfo;
+    });
   }
 
   /**
@@ -334,7 +371,14 @@ class MonitorManager {
    */
   getMonitor(monitorId: string): MonitorInfo | null {
     const monitor = this.monitors.find(m => m.id === monitorId);
-    return monitor ? { ...monitor, name: this.getMonitorName(monitor.id) || monitor.name } : null;
+    if (!monitor) return null;
+    
+    const customName = this.getMonitorName(monitor.id);
+    const finalName = customName || monitor.name;
+    
+    return finalName 
+      ? { ...monitor, name: finalName } as MonitorInfo
+      : { ...monitor } as MonitorInfo;
   }
 
   /**

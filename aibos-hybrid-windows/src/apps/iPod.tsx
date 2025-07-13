@@ -64,7 +64,7 @@ export default function iPod({ onClose }: iPodProps) {
       setIsLoading(false);
     });
 
-    audioPlayer.setOnPlaylistChange((playlist) => {
+    audioPlayer.setOnPlaylistChange((_playlist) => {
       // setPlaylist(playlist); // This line is removed as per the edit hint
     });
 
@@ -193,6 +193,7 @@ export default function iPod({ onClose }: iPodProps) {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">iPod</h2>
         <button 
+          type="button"
           onClick={onClose}
           className="text-gray-400 hover:text-white transition-colors"
           aria-label="Close iPod"
@@ -279,6 +280,7 @@ export default function iPod({ onClose }: iPodProps) {
       {/* Controls */}
       <div className="flex justify-center items-center gap-4">
         <button
+          type="button"
           onClick={handlePrev}
           className="w-12 h-12 rounded-full hover:bg-gray-700 flex items-center justify-center transition-colors"
           style={buttonStyle}
@@ -289,6 +291,7 @@ export default function iPod({ onClose }: iPodProps) {
         </button>
         
         <button
+          type="button"
           onClick={handlePlayPause}
           className="w-16 h-16 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors"
           style={playButtonStyle}
@@ -299,6 +302,7 @@ export default function iPod({ onClose }: iPodProps) {
         </button>
         
         <button
+          type="button"
           onClick={handleNext}
           className="w-12 h-12 rounded-full hover:bg-gray-700 flex items-center justify-center transition-colors"
           style={buttonStyle}

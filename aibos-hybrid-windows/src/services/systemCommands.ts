@@ -257,7 +257,7 @@ class SystemCommandsService {
         description: 'View detailed system information and status',
         icon: 'ℹ️',
         shortcut: 'Ctrl+I',
-        action: async () => {
+        action: () => {
           this.logger.info('System Information:', { component: 'SystemCommands', action: 'systemInfo' });
           this.logger.info('- OS: AI-BOS Hybrid Windows');
           this.logger.info('- Version: 1.0.0');
@@ -287,7 +287,7 @@ class SystemCommandsService {
         description: 'Monitor system performance and resource usage',
         icon: '📊',
         shortcut: 'Ctrl+P',
-        action: async () => {
+        action: () => {
           this.logger.info('Performance Monitor:', { component: 'SystemCommands', action: 'performanceMonitor' });
           this.logger.info('- CPU Usage: 45%');
           this.logger.info('- Memory Usage: 62%');

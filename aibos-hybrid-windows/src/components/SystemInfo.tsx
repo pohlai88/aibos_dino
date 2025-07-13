@@ -1,5 +1,5 @@
 import React from 'react';
-import { systemIntegration } from '../services/systemIntegration';
+import { systemIntegration } from '../services/systemIntegration.ts';
 
 interface SystemInfoProps {
   className?: string;

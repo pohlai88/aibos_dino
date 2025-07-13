@@ -1,5 +1,5 @@
-import { SystemCapabilities } from '../system/types';
-import { Logger } from './logger';
+import { SystemCapabilities } from '../system/types.ts';
+import { Logger } from './logger.ts';
 
 export class PermissionManager {
   private logger: Logger;
@@ -40,15 +40,15 @@ export class PermissionManager {
     });
   }
 
-  private async requestNotificationPermission(): Promise<NotificationPermission> {
+  private requestNotificationPermission(): Promise<NotificationPermission> {
     return Notification.requestPermission();
   }
 
-  private async requestClipboardPermission(): Promise<PermissionStatus> {
+  private requestClipboardPermission(): Promise<PermissionStatus> {
     return navigator.permissions.query({ name: 'clipboard-read' as PermissionName });
   }
 
-  private async requestStoragePermission(): Promise<PermissionStatus> {
+  private requestStoragePermission(): Promise<PermissionStatus> {
     return navigator.permissions.query({ name: 'persistent-storage' as PermissionName });
   }
 }

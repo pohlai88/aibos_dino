@@ -110,7 +110,7 @@ class SearchPerformanceOptimizer {
   /**
    * Measure search performance
    */
-  async measureSearch<T>(
+  measureSearch<T>(
     query: string,
     searchFunction: () => Promise<T[]>,
     options: {
@@ -351,13 +351,23 @@ export function useOptimizedSearch<T>(
         return [];
       }
 
+      const searchOptions: {
+        useCache?: boolean;
+        maxResults?: number;
+      } = {};
+      
+      if (options.useCache !== undefined) {
+        searchOptions.useCache = options.useCache;
+      }
+      
+      if (options.maxResults !== undefined) {
+        searchOptions.maxResults = options.maxResults;
+      }
+
       const { results } = await searchPerformanceOptimizer.measureSearch(
         query,
         () => debouncedSearch(query),
-        {
-          useCache: options.useCache,
-          maxResults: options.maxResults,
-        }
+        searchOptions
       );
 
       return searchPerformanceOptimizer.optimizeResults(results, options.maxResults);

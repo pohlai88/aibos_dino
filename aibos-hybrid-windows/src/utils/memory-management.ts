@@ -3,6 +3,7 @@
  * Provides automatic cleanup and memory tracking
  */
 
+import React from 'react';
 import { CleanupFunction, MemoryTracker } from '../types/enhanced-types.ts';
 
 // Memory tracker implementation
@@ -74,7 +75,7 @@ export function useMemoryCleanup() {
 export function useEffectWithCleanup(
   effect: () => CleanupFunction | void,
   deps?: React.DependencyList
-) {
+): void {
   const { addCleanup } = useMemoryCleanup();
 
   React.useEffect(() => {
@@ -83,6 +84,7 @@ export function useEffectWithCleanup(
       addCleanup(cleanup);
       return cleanup;
     }
+    return undefined;
   }, deps);
 }
 

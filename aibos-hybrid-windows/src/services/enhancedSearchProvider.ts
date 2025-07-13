@@ -21,7 +21,7 @@ class EnhancedSearchProvider implements SearchProvider {
   id = 'enhanced-search';
   name = 'Enhanced Search';
   description = 'Advanced file and content search with filtering';
-  priority = 6; // Higher priority than basic search
+  priority = 6;
 
   private logger = new EnterpriseLogger();
   private searchHistory: string[] = [];
@@ -34,9 +34,6 @@ class EnhancedSearchProvider implements SearchProvider {
     this.maxResults = options.maxResults ?? 20;
   }
 
-  /**
-   * Search with advanced capabilities
-   */
   async search(query: string, limit?: number): Promise<SearchResult[]> {
     if (!query.trim()) return [];
 
@@ -53,7 +50,7 @@ class EnhancedSearchProvider implements SearchProvider {
       this.logger.info('Enhanced search completed', {
         component: 'EnhancedSearchProvider',
         action: 'search',
-        metadata: { 
+        metadata: {
           duration: `${duration.toFixed(2)}ms`,
           resultCount: results.length,
           query: searchQuery
@@ -65,7 +62,7 @@ class EnhancedSearchProvider implements SearchProvider {
       this.logger.warn('Enhanced search failed', {
         component: 'EnhancedSearchProvider',
         action: 'search',
-        metadata: { 
+        metadata: {
           error: error instanceof Error ? error.message : String(error),
           query
         }
@@ -74,9 +71,6 @@ class EnhancedSearchProvider implements SearchProvider {
     }
   }
 
-  /**
-   * Get quick access items
-   */
   async getQuickAccess(limit: number = 8): Promise<SearchResult[]> {
     try {
       const recentFiles = await this.getRecentFiles(limit);
@@ -85,7 +79,7 @@ class EnhancedSearchProvider implements SearchProvider {
       this.logger.warn('Failed to get quick access', {
         component: 'EnhancedSearchProvider',
         action: 'getQuickAccess',
-        metadata: { 
+        metadata: {
           error: error instanceof Error ? error.message : String(error),
           limit
         }
@@ -94,65 +88,50 @@ class EnhancedSearchProvider implements SearchProvider {
     }
   }
 
-  /**
-   * Search files with advanced filtering
-   */
   private async searchFiles(query: string, filters: SearchFilters, limit: number): Promise<FileMetadata[]> {
-    // Use fuzzy search if enabled
     if (this.fuzzySearchEnabled && query.length > 2) {
       return this.fuzzySearch(query, filters, limit);
     }
 
-    // Use exact search
-    return fileIndexer.search(query, filters).then(results => results.slice(0, limit));
+    const results = await fileIndexer.search(query, filters);
+    return results.slice(0, limit);
   }
 
-  /**
-   * Fuzzy search with typo tolerance
-   */
   private async fuzzySearch(query: string, filters: SearchFilters, limit: number): Promise<FileMetadata[]> {
-    const results = await fileIndexer.search('', filters); // Get all files with filters
+    const results = await fileIndexer.search('', filters);
     const queryLower = query.toLowerCase();
 
-    // Score each result based on similarity
     const scoredResults = results.map(file => ({
       file,
       score: this.calculateSimilarity(file, queryLower)
     }));
 
-    // Sort by score and return top results
     return scoredResults
-      .filter(item => item.score > 0.3) // Minimum similarity threshold
+      .filter(item => item.score > 0.3)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
       .map(item => item.file);
   }
 
-  /**
-   * Calculate similarity score between file and query
-   */
   private calculateSimilarity(file: FileMetadata, query: string): number {
     const nameLower = file.name.toLowerCase();
-    const pathLower = file.path.toLowerCase();
-    const tagsLower = file.tags.map(tag => tag.toLowerCase()).join(' ');
-    const contentLower = file.content?.toLowerCase() || '';
+    const pathLower = file.path?.toLowerCase() ?? '';
+    const tagsLower = (file.tags ?? []).map(tag => tag.toLowerCase()).join(' ');
+    const contentLower = file.content?.toLowerCase() ?? '';
 
-    // Exact matches get highest score
     if (nameLower === query) return 1.0;
     if (nameLower.startsWith(query)) return 0.9;
     if (pathLower.includes(query)) return 0.8;
 
-    // Partial matches
     let score = 0;
     if (nameLower.includes(query)) score += 0.6;
     if (tagsLower.includes(query)) score += 0.4;
     if (contentLower.includes(query)) score += 0.3;
 
-    // Levenshtein distance for typo tolerance
     const nameDistance = this.levenshteinDistance(nameLower, query);
     const maxDistance = Math.max(nameLower.length, query.length);
     const distanceScore = 1 - (nameDistance / maxDistance);
-    
+
     if (distanceScore > 0.7) {
       score = Math.max(score, distanceScore * 0.5);
     }
@@ -160,37 +139,36 @@ class EnhancedSearchProvider implements SearchProvider {
     return Math.min(score, 1.0);
   }
 
-  /**
-   * Calculate Levenshtein distance for fuzzy matching
-   */
   private levenshteinDistance(str1: string, str2: string): number {
-    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
-
-    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
-    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    if (!str1 || !str2) return 0;
+    const matrix: number[][] = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(0));
+    const firstRow = matrix[0] ?? [];
+    for (let i = 0; i <= str1.length; i++) (firstRow ?? [])[i] = i;
+    matrix[0] = firstRow;
+    for (let j = 0; j <= str2.length; j++) (matrix[j] ?? [])[0] = j;
 
     for (let j = 1; j <= str2.length; j++) {
+      const currentRow = matrix[j] ?? Array(str1.length + 1).fill(0);
+      const prevRow = matrix[j - 1] ?? Array(str1.length + 1).fill(0);
       for (let i = 1; i <= str1.length; i++) {
         const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-        matrix[j][i] = Math.min(
-          matrix[j][i - 1] + 1, // deletion
-          matrix[j - 1][i] + 1, // insertion
-          matrix[j - 1][i - 1] + indicator // substitution
+        currentRow[i] = Math.min(
+          currentRow[i - 1] + 1,
+          prevRow[i] + 1,
+          prevRow[i - 1] + indicator
         );
       }
+      matrix[j] = currentRow;
     }
 
-    return matrix[str2.length][str1.length];
+    const lastRow = matrix[str2.length] ?? Array(str1.length + 1).fill(0);
+    return lastRow[str1.length];
   }
 
-  /**
-   * Parse query for filters and search terms
-   */
   private parseQuery(query: string): { searchQuery: string; filters: SearchFilters } {
     const filters: SearchFilters = {};
     let searchQuery = query;
 
-    // Parse type filters
     if (query.includes('type:file')) {
       filters.type = 'file';
       searchQuery = searchQuery.replace('type:file', '').trim();
@@ -199,41 +177,44 @@ class EnhancedSearchProvider implements SearchProvider {
       searchQuery = searchQuery.replace('type:dir', '').trim();
     }
 
-    // Parse extension filters
     const extMatch = query.match(/ext:(\w+)/g);
     if (extMatch) {
-      filters.extension = extMatch.map(match => `.${match.split(':')[1]}`);
+      filters.extension = extMatch
+        .map(match => match.split(':')[1])
+        .filter((v): v is string => v !== undefined)
+        .map(ext => `.${ext}`);
       searchQuery = searchQuery.replace(/ext:\w+/g, '').trim();
     }
 
-    // Parse size filters
     const sizeMatch = query.match(/size:(\d+)([kmg]?)/i);
     if (sizeMatch) {
-      const size = parseInt(sizeMatch[1]);
-      const unit = sizeMatch[2].toLowerCase();
-      const multiplier = unit === 'k' ? 1024 : unit === 'm' ? 1024 * 1024 : unit === 'g' ? 1024 * 1024 * 1024 : 1;
+      const size = parseInt(sizeMatch[1] ?? '0');
+      const unit = sizeMatch[2]?.toLowerCase() ?? '';
+      const multiplier =
+        unit === 'k' ? 1024 :
+        unit === 'm' ? 1024 * 1024 :
+        unit === 'g' ? 1024 * 1024 * 1024 : 1;
       filters.size = { max: size * multiplier };
       searchQuery = searchQuery.replace(/size:\d+[kmg]?/i, '').trim();
     }
 
-    // Parse date filters
     const dateMatch = query.match(/date:(\d+)/);
     if (dateMatch) {
-      const days = parseInt(dateMatch[1]);
+      const days = parseInt(dateMatch[1] ?? '0');
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - days);
       filters.date = { from: fromDate };
       searchQuery = searchQuery.replace(/date:\d+/, '').trim();
     }
 
-    // Parse tag filters
     const tagMatch = query.match(/tag:(\w+)/g);
     if (tagMatch) {
-      filters.tags = tagMatch.map(match => match.split(':')[1]);
+      filters.tags = tagMatch
+        .map(match => match.split(':')[1])
+        .filter((v): v is string => v !== undefined);
       searchQuery = searchQuery.replace(/tag:\w+/g, '').trim();
     }
 
-    // Parse content search
     if (query.includes('content:')) {
       filters.content = true;
       searchQuery = searchQuery.replace('content:', '').trim();
@@ -242,9 +223,6 @@ class EnhancedSearchProvider implements SearchProvider {
     return { searchQuery, filters };
   }
 
-  /**
-   * Get recently modified files
-   */
   private async getRecentFiles(limit: number): Promise<FileMetadata[]> {
     const allFiles = await fileIndexer.search('', { type: 'file' });
     return allFiles
@@ -252,9 +230,6 @@ class EnhancedSearchProvider implements SearchProvider {
       .slice(0, limit);
   }
 
-  /**
-   * Create search result from file metadata
-   */
   private createFileSearchResult(file: FileMetadata): SearchResult {
     const icon = this.getFileIcon(file);
     const description = this.getFileDescription(file);
@@ -274,19 +249,15 @@ class EnhancedSearchProvider implements SearchProvider {
           size: file.size,
           modified: file.modified,
           extension: file.extension,
-          tags: file.tags,
+          tags: file.tags
         }
       }
     );
   }
 
-  /**
-   * Get appropriate icon for file type
-   */
   private getFileIcon(file: FileMetadata): string {
     if (file.type === 'directory') return '📁';
-    
-    const extension = file.extension?.toLowerCase();
+    const extension = file.extension?.toLowerCase() ?? '';
     const iconMap: Record<string, string> = {
       '.txt': '📄',
       '.md': '📝',
@@ -333,34 +304,26 @@ class EnhancedSearchProvider implements SearchProvider {
       '.rar': '📦',
       '.7z': '📦',
       '.tar': '📦',
-      '.gz': '📦',
+      '.gz': '📦'
     };
-
-    return iconMap[extension || ''] || '📄';
+    return iconMap[extension] || '📄';
   }
 
-  /**
-   * Get file description
-   */
   private getFileDescription(file: FileMetadata): string {
     if (file.type === 'directory') {
       return `Directory • ${file.path}`;
     }
-
     const size = this.formatFileSize(file.size);
     const date = file.modified.toLocaleDateString();
-    const tags = file.tags.length > 0 ? ` • ${file.tags.slice(0, 3).join(', ')}` : '';
-    
+    const tags = (file.tags?.length ?? 0) > 0
+      ? ` • ${file.tags!.slice(0, 3).join(', ')}`
+      : '';
     return `${size} • ${date}${tags}`;
   }
 
-  /**
-   * Get file category
-   */
   private getFileCategory(file: FileMetadata): string {
     if (file.type === 'directory') return 'Directory';
-    
-    const extension = file.extension?.toLowerCase();
+    const extension = file.extension?.toLowerCase() ?? '';
     const categoryMap: Record<string, string> = {
       '.txt': 'Text',
       '.md': 'Documentation',
@@ -407,85 +370,53 @@ class EnhancedSearchProvider implements SearchProvider {
       '.rar': 'Archive',
       '.7z': 'Archive',
       '.tar': 'Archive',
-      '.gz': 'Archive',
+      '.gz': 'Archive'
     };
-
-    return categoryMap[extension || ''] || 'File';
+    return categoryMap[extension] || 'File';
   }
 
-  /**
-   * Format file size
-   */
   private formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 B';
-    
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   }
 
-  /**
-   * Open file action
-   */
-  private async openFile(file: FileMetadata): Promise<void> {
-    try {
-      // In a real implementation, this would open the file with the appropriate app
-      this.logger.info(`Opening file: ${file.path}`, { component: 'EnhancedSearchProvider', action: 'openFile', metadata: { path: file.path } });
-      
-      // For now, just log the action
-      console.log(`Would open file: ${file.path}`);
-    } catch (error) {
-      this.logger.warn(`Failed to open file ${file.path}: ${error instanceof Error ? error.message : String(error)}`, { component: 'EnhancedSearchProvider', action: 'openFile', metadata: { path: file.path } });
-    }
+  private openFile(file: FileMetadata): void {
+    this.logger.info(`Opening file: ${file.path ?? '[unknown path]'}`, {
+      component: 'EnhancedSearchProvider',
+      action: 'openFile',
+      metadata: { path: file.path }
+    });
+    console.log(`Would open file: ${file.path ?? '[unknown path]'}`);
   }
 
-  /**
-   * Add query to search history
-   */
   private addToHistory(query: string): void {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) return;
-
-    // Remove if already exists
     this.searchHistory = this.searchHistory.filter(q => q !== trimmedQuery);
-    
-    // Add to beginning
     this.searchHistory.unshift(trimmedQuery);
-    
-    // Keep only recent searches
     if (this.searchHistory.length > this.maxHistorySize) {
       this.searchHistory = this.searchHistory.slice(0, this.maxHistorySize);
     }
   }
 
-  /**
-   * Get search history
-   */
   getSearchHistory(): string[] {
     return [...this.searchHistory];
   }
 
-  /**
-   * Get search suggestions
-   */
   getSuggestions(partialQuery: string): string[] {
     if (!partialQuery.trim()) return [];
-
     const query = partialQuery.toLowerCase();
     return this.searchHistory
       .filter(historyQuery => historyQuery.toLowerCase().includes(query))
       .slice(0, 5);
   }
 
-  /**
-   * Clear search history
-   */
   clearHistory(): void {
     this.searchHistory = [];
   }
 }
 
-// Export singleton instance
 export const enhancedSearchProvider = new EnhancedSearchProvider();

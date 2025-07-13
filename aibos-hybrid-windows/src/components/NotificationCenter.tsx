@@ -5,9 +5,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { notificationService, Notification, NotificationChannel } from '../services/notification-service';
-import { useMemoryCleanup } from '../utils/memory-management';
-import { usePerformanceTracking } from '../utils/performance-monitor';
+import { notificationService, Notification } from '../services/notification-service.ts';
+import { useMemoryCleanup } from '../utils/memory-management.ts';
+import { usePerformanceTracking } from '../utils/performance-monitor.ts';
+import { EventEmitter } from 'node:events';
 
 interface NotificationCenterProps {
   className?: string;
@@ -16,11 +17,33 @@ interface NotificationCenterProps {
   theme?: 'light' | 'dark' | 'auto';
 }
 
+const icons = {
+  info: '🔵',
+  success: '✅',
+  warning: '⚠️',
+  error: '❌',
+  system: '⚙️',
+};
+
+const colors = {
+  low: 'border-gray-300 bg-gray-50',
+  normal: 'border-blue-300 bg-blue-50',
+  high: 'border-orange-300 bg-orange-50',
+  critical: 'border-red-300 bg-red-50',
+};
+
+const typeColors = {
+  error: 'bg-red-500',
+  warning: 'bg-yellow-500',
+  success: 'bg-green-500',
+  info: 'bg-blue-500',
+  system: 'bg-purple-500',
+};
+
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   className = '',
   maxVisible = 5,
   position = 'top-right',
-  theme = 'auto'
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -96,15 +119,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     };
 
     // Subscribe to notification events
-    notificationService.on('notification:delivered', handleNotificationDelivered);
-    notificationService.on('notification:dismissed', handleNotificationDismissed);
-    notificationService.on('notification:updated', handleNotificationUpdated);
+    (notificationService as unknown as EventEmitter).on('notification:delivered', handleNotificationDelivered);
+    (notificationService as unknown as EventEmitter).on('notification:dismissed', handleNotificationDismissed);
+    (notificationService as unknown as EventEmitter).on('notification:updated', handleNotificationUpdated);
 
     // Cleanup function
     const cleanup = () => {
-      notificationService.off('notification:delivered', handleNotificationDelivered);
-      notificationService.off('notification:dismissed', handleNotificationDismissed);
-      notificationService.off('notification:updated', handleNotificationUpdated);
+      (notificationService as unknown as EventEmitter).off('notification:delivered', handleNotificationDelivered);
+      (notificationService as unknown as EventEmitter).off('notification:dismissed', handleNotificationDismissed);
+      (notificationService as unknown as EventEmitter).off('notification:updated', handleNotificationUpdated);
     };
 
     addCleanup(cleanup);
@@ -174,24 +197,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   };
 
   const getNotificationIcon = (type: Notification['type']) => {
-    const icons = {
-      info: '🔵',
-      success: '✅',
-      warning: '⚠️',
-      error: '❌',
-      system: '⚙️'
-    };
-    return icons[type] || '📢';
+    return icons[type as keyof typeof icons] || '📢';
   };
 
   const getPriorityColor = (priority: Notification['priority']) => {
-    const colors = {
-      low: 'border-gray-300 bg-gray-50',
-      normal: 'border-blue-300 bg-blue-50',
-      high: 'border-orange-300 bg-orange-50',
-      critical: 'border-red-300 bg-red-50'
-    };
-    return colors[priority] || colors.normal;
+    return colors[priority as keyof typeof colors] || colors.normal;
   };
 
   // 🔥 ENHANCEMENT 3: Customizable progress bar colors based on notification type
@@ -199,14 +209,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
     if (priority === 'critical') return 'bg-red-500';
     if (priority === 'high') return 'bg-orange-500';
     
-    const typeColors = {
-      error: 'bg-red-500',
-      warning: 'bg-yellow-500',
-      success: 'bg-green-500',
-      info: 'bg-blue-500',
-      system: 'bg-purple-500'
-    };
-    return typeColors[type] || 'bg-blue-500';
+    return typeColors[type as keyof typeof typeColors] || 'bg-blue-500';
   };
 
   if (visibleNotifications.length === 0) {
@@ -242,6 +245,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </h3>
             <div className="flex items-center space-x-2">
               <button
+                type="button"
                 onClick={handleDismissAll}
                 className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded transition-colors"
                 aria-label={`Clear all ${visibleNotifications.length} notifications`}
@@ -249,6 +253,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 Clear All
               </button>
               <button
+                type="button"
                 onClick={() => setIsExpanded(false)}
                 className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                 aria-label="Collapse notification center"
@@ -309,7 +314,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         aria-live="polite"
       >
         <AnimatePresence mode="popLayout">
-          {visibleNotifications.map((notification, index) => (
+          {visibleNotifications.map((notification: Notification, index: number) => (
             <motion.div
               key={notification.id}
               layout
@@ -351,6 +356,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                       {notification.title}
                     </h4>
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDismiss(notification.id);
@@ -394,8 +400,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   {/* Actions */}
                   {notification.actions && notification.actions.length > 0 && (
                     <div className="flex space-x-2 mt-3" role="group" aria-label="Notification actions">
-                      {notification.actions.slice(0, 2).map((action) => (
+                      {notification.actions.slice(0, 2).map((action: { id: string; label: string; action: () => void; style?: string }) => (
                         <button
+                          type="button"
                           key={action.id}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -444,6 +451,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       {/* Expand/Collapse Button */}
       {filteredNotifications.length > maxVisible && (
         <motion.button
+          type="button"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           onClick={() => setIsExpanded(!isExpanded)}

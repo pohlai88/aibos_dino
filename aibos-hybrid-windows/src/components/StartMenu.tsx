@@ -112,7 +112,7 @@ export const StartMenu = memo(() => {
     // Add system commands
     const commands = systemCommands.getAll();
     commands.forEach(cmd => {
-      items.push({
+      const menuItem: MenuItem = {
         id: `cmd-${cmd.id}`,
         name: cmd.title,
         icon: cmd.icon || '⚙️',
@@ -124,9 +124,14 @@ export const StartMenu = memo(() => {
           toggleStartMenu();
           audioManager.playButtonClick();
           hapticManager.playButtonPress();
-        },
-        shortcut: cmd.shortcut
-      });
+        }
+      };
+      
+      if (cmd.shortcut) {
+        menuItem.shortcut = cmd.shortcut;
+      }
+      
+      items.push(menuItem);
     });
 
     // Add keyboard shortcuts
@@ -339,6 +344,7 @@ export const StartMenu = memo(() => {
               />
             </div>
             <button
+              type="button"
               onClick={toggleStartMenu}
               className={`text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${
                 isMobile ? 'p-1' : 'p-2'
@@ -365,6 +371,7 @@ export const StartMenu = memo(() => {
               {categoryList.map((category) => (
                 <button
                   key={category}
+                  type="button"
                   role="tab"
                   aria-selected={activeCategory === category}
                   aria-controls="menu-items"

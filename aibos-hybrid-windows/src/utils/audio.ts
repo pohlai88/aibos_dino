@@ -236,7 +236,7 @@ class AudioManager {
   private audioCache: Map<string, AudioBuffer> = new Map();
   private isInitialized = false;
   private logger: AudioLogger | null = null;
-  private deviceProfiles: AudioDeviceProfile[] = [];
+  // private deviceProfiles: AudioDeviceProfile[] = []; // Unused - commented out
   private configSource: AudioConfigSource | null = null;
   private playingSources: Map<string, AudioBufferSourceNode> = new Map();
   
@@ -268,8 +268,8 @@ class AudioManager {
   }
 
   // Enterprise: Set device profiles
-  setDeviceProfiles(profiles: AudioDeviceProfile[]) {
-    this.deviceProfiles = profiles;
+  setDeviceProfiles(): void {
+    // No-op: deviceProfiles property removed
   }
 
   // Enterprise: Set active device profile
@@ -461,7 +461,11 @@ class AudioManager {
       
       if (effect.file) {
         // File playback
-        await this.playFile(effect.file, { volume: effect.volume, category: effect.category });
+        const options: { volume?: number; category?: SoundEffect['category'] } = { category: effect.category };
+        if (effect.volume !== undefined) {
+          options.volume = effect.volume;
+        }
+        await this.playFile(effect.file, options);
         return;
       } else if (!buffer && effect.frequency) {
         const volume = this.getVolumeForCategory(effect.category) * (effect.volume || 1.0);
@@ -691,7 +695,11 @@ export class AudioPlayer {
     if (this.isShuffled) {
       for (let i = this.shuffledIndices.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [this.shuffledIndices[i], this.shuffledIndices[j]] = [this.shuffledIndices[j], this.shuffledIndices[i]];
+        const temp = this.shuffledIndices[i];
+        if (temp !== undefined && this.shuffledIndices[j] !== undefined) {
+          this.shuffledIndices[i] = this.shuffledIndices[j];
+          this.shuffledIndices[j] = temp;
+        }
       }
     }
   }
@@ -701,6 +709,9 @@ export class AudioPlayer {
     if (!this.currentPlaylist || this.currentPlaylist.tracks.length === 0) return null;
     
     const actualIndex = this.isShuffled ? this.shuffledIndices[this.currentTrackIndex] : this.currentTrackIndex;
+    if (actualIndex === undefined || actualIndex < 0 || actualIndex >= this.currentPlaylist.tracks.length) {
+      return null;
+    }
     return this.currentPlaylist.tracks[actualIndex] || null;
   }
 

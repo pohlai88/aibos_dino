@@ -98,7 +98,7 @@ export function preloadCriticalComponents() {
 export class ComponentRegistry {
   private static cache = new Map<string, Promise<unknown>>();
   
-  static async loadComponent(name: string, importFunc: () => Promise<unknown>) {
+  static loadComponent(name: string, importFunc: () => Promise<unknown>) {
     if (!this.cache.has(name)) {
       this.cache.set(name, importFunc());
     }

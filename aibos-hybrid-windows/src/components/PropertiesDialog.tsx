@@ -27,7 +27,7 @@ interface FileEntry extends BaseItem {
 
 type FileItem = FolderItem | FileEntry;
 
-interface PropertiesDialogProps {
+export interface PropertiesDialogProps {
   isVisible: boolean;
   item: FileItem | null;
   onClose: () => void;
@@ -369,6 +369,7 @@ export const PropertiesDialog: React.FC<PropertiesDialogProps> = memo(({
             {(['general', 'security', 'details'] as const).map((tab) => (
               <button
                 key={tab}
+                type="button"
                 onClick={() => handleTabChange(tab)}
                 style={dialogStyles.tab(activeTab === tab)}
                 className="flex-1 px-4 py-3 text-sm font-medium hover:bg-opacity-10"

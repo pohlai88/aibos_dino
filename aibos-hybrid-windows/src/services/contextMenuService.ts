@@ -1,7 +1,7 @@
 // Enhanced Context Menu Service with OS Integration
-import { systemIntegration } from './systemIntegration';
-import { fileAssociationService } from './fileAssociations';
-import { EnterpriseLogger } from './core/logger';
+import { systemIntegration } from './systemIntegration.ts';
+import { FileAssociationService, FileAssociation } from './fileAssociations.ts';
+import { EnterpriseLogger } from './core/logger.ts';
 
 export interface ContextMenuItem {
   id: string;
@@ -16,40 +16,41 @@ export interface ContextMenuItem {
 }
 
 export interface ContextMenuConfig {
-  target: HTMLElement;
+  target?: HTMLElement;
   items: ContextMenuItem[];
   position?: { x: number; y: number };
   theme?: 'light' | 'dark' | 'auto';
 }
 
 class ContextMenuService {
-  private logger = new EnterpriseLogger('ContextMenuService');
+  private logger = new EnterpriseLogger();
   private activeMenu: HTMLElement | null = null;
-  private isNativeSupported = false;
+  private _isNativeSupported = false;
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     try {
-      await this.checkNativeSupport();
+      this.checkNativeSupport();
       this.setupGlobalListeners();
-      this.logger.log('Context menu service initialized');
+      this.logger.info('Context menu service initialized', {
+        component: 'ContextMenuService',
+        action: 'initialize'
+      });
     } catch (error) {
-      this.logger.error('Failed to initialize context menu service:', error);
+      this.logger.error('Failed to initialize context menu service', {
+        component: 'ContextMenuService',
+        action: 'initialize',
+        metadata: { error: error instanceof Error ? error.message : String(error) }
+      });
     }
   }
 
-  private async checkNativeSupport(): Promise<void> {
-    // Check for native context menu API support
-    this.isNativeSupported = 'contextMenu' in navigator || 'registerProtocolHandler' in navigator;
+  private checkNativeSupport(): void {
+    this._isNativeSupported = 'contextMenu' in navigator || 'registerProtocolHandler' in navigator;
   }
 
   private setupGlobalListeners(): void {
-    // Global right-click handler
     document.addEventListener('contextmenu', this.handleGlobalContextMenu.bind(this));
-    
-    // Close menu on click outside
     document.addEventListener('click', this.closeActiveMenu.bind(this));
-    
-    // Handle escape key
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.activeMenu) {
         this.closeActiveMenu();
@@ -59,39 +60,34 @@ class ContextMenuService {
 
   private async handleGlobalContextMenu(event: MouseEvent): Promise<void> {
     const target = event.target as HTMLElement;
-    
-    // Check if target has custom context menu
     const menuConfig = this.getContextMenuForElement(target);
-    if (menuConfig) {
+    if (menuConfig && menuConfig.items && menuConfig.items.length > 0) {
       event.preventDefault();
       await this.showContextMenu({
         ...menuConfig,
-        position: { x: event.clientX, y: event.clientY }
+        position: { x: event.clientX, y: event.clientY },
+        items: menuConfig.items
       });
     }
   }
 
   private getContextMenuForElement(element: HTMLElement): Partial<ContextMenuConfig> | null {
-    // File items
     if (element.closest('[data-file-item]')) {
       const fileItem = element.closest('[data-file-item]') as HTMLElement;
-      const filePath = fileItem.dataset.filePath;
-      const fileName = fileItem.dataset.fileName;
-      const isDirectory = fileItem.dataset.isDirectory === 'true';
-      
+      const filePath = fileItem.dataset['filePath'];
+      const fileName = fileItem.dataset['fileName'];
+      const isDirectory = fileItem.dataset['isDirectory'] === 'true';
       return {
         items: this.getFileContextMenuItems(filePath!, fileName!, isDirectory)
       };
     }
 
-    // Desktop/workspace area
     if (element.closest('[data-desktop-area]')) {
       return {
         items: this.getDesktopContextMenuItems()
       };
     }
 
-    // Window title bars
     if (element.closest('[data-window-titlebar]')) {
       const windowId = element.closest('[data-window]')?.getAttribute('data-window-id');
       return {
@@ -114,7 +110,8 @@ class ContextMenuService {
         id: 'open-with',
         label: 'Open with...',
         icon: '🔧',
-        submenu: this.getOpenWithSubmenu(filePath)
+        submenu: this.getOpenWithSubmenu(filePath),
+        action: () => {}
       },
       {
         id: 'separator-1',
@@ -179,7 +176,6 @@ class ContextMenuService {
       }
     ];
 
-    // Add directory-specific items
     if (isDirectory) {
       items.splice(2, 0, {
         id: 'open-terminal',
@@ -194,10 +190,12 @@ class ContextMenuService {
 
   private getOpenWithSubmenu(filePath: string): ContextMenuItem[] {
     const extension = '.' + filePath.split('.').pop()?.toLowerCase();
+    const fileAssociationService = new FileAssociationService(this.logger);
     const associations = fileAssociationService.getRegisteredAssociations();
-    const _relevantApps = associations.filter(a => a.extension === extension);
+    // Filter relevant apps for the extension
+    associations.filter((a: FileAssociation) => a.extension === extension);
 
-    const items: ContextMenuItem[] = [
+    return [
       {
         id: 'open-aibos',
         label: 'AI-BOS (Default)',
@@ -229,8 +227,6 @@ class ContextMenuService {
         action: () => this.chooseApplication(filePath)
       }
     ];
-
-    return items;
   }
 
   private getDesktopContextMenuItems(): ContextMenuItem[] {
@@ -264,7 +260,8 @@ class ContextMenuService {
             icon: '🔧',
             action: () => this.createNewFile('json')
           }
-        ]
+        ],
+        action: () => {}
       },
       {
         id: 'separator-1',
@@ -341,26 +338,21 @@ class ContextMenuService {
   async showContextMenu(config: ContextMenuConfig): Promise<void> {
     try {
       this.closeActiveMenu();
-      
-      if (this.isNativeSupported) {
-        await this.showNativeContextMenu(config);
-      } else {
-        await this.showCustomContextMenu(config);
-      }
+      await this.showCustomContextMenu(config);
     } catch (error) {
-      this.logger.error('Failed to show context menu:', error);
+      this.logger.error('Failed to show context menu', {
+        component: 'ContextMenuService',
+        action: 'showContextMenu',
+        metadata: { error: error instanceof Error ? error.message : String(error) }
+      });
     }
   }
 
-  private async showCustomContextMenu(config: ContextMenuConfig): Promise<void> {
+  private showCustomContextMenu(config: ContextMenuConfig): void {
     const menu = this.createCustomMenuElement(config);
     document.body.appendChild(menu);
     this.activeMenu = menu;
-    
-    // Position menu
     this.positionMenu(menu, config.position || { x: 0, y: 0 });
-    
-    // Focus first item
     const firstItem = menu.querySelector('[role="menuitem"]:not([aria-disabled="true"])') as HTMLElement;
     firstItem?.focus();
   }
@@ -375,12 +367,12 @@ class ContextMenuService {
     `;
     menu.setAttribute('role', 'menu');
     menu.setAttribute('aria-orientation', 'vertical');
-    
+
     config.items.forEach((item, index) => {
       const menuItem = this.createMenuItem(item, index);
       menu.appendChild(menuItem);
     });
-    
+
     return menu;
   }
 
@@ -401,41 +393,35 @@ class ContextMenuService {
       disabled:opacity-50 disabled:cursor-not-allowed
       flex items-center justify-between
     `;
-    
     menuItem.setAttribute('role', 'menuitem');
     menuItem.setAttribute('tabindex', index === 0 ? '0' : '-1');
-    
     if (item.enabled === false) {
       menuItem.disabled = true;
       menuItem.setAttribute('aria-disabled', 'true');
     }
 
-    // Content
     const content = document.createElement('div');
     content.className = 'flex items-center space-x-2';
-    
+
     if (item.icon) {
       const icon = document.createElement('span');
       icon.textContent = item.icon;
       icon.className = 'text-base';
       content.appendChild(icon);
     }
-    
+
     const label = document.createElement('span');
     label.textContent = item.label;
     content.appendChild(label);
-    
     menuItem.appendChild(content);
-    
-    // Shortcut
+
     if (item.shortcut) {
       const shortcut = document.createElement('span');
       shortcut.textContent = item.shortcut;
       shortcut.className = 'text-xs text-gray-500 dark:text-gray-400';
       menuItem.appendChild(shortcut);
     }
-    
-    // Submenu indicator
+
     if (item.submenu) {
       const arrow = document.createElement('span');
       arrow.textContent = '▶';
@@ -443,7 +429,6 @@ class ContextMenuService {
       menuItem.appendChild(arrow);
     }
 
-    // Event handlers
     menuItem.addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!item.submenu) {
@@ -452,7 +437,6 @@ class ContextMenuService {
       }
     });
 
-    // Keyboard navigation
     menuItem.addEventListener('keydown', (e) => {
       this.handleMenuKeydown(e, menuItem);
     });
@@ -466,25 +450,29 @@ class ContextMenuService {
     const currentIndex = items.indexOf(menuItem);
 
     switch (event.key) {
-      case 'ArrowDown':
+      case 'ArrowDown': {
         event.preventDefault();
         const nextIndex = (currentIndex + 1) % items.length;
         items[nextIndex]?.focus();
         break;
-      case 'ArrowUp':
+      }
+      case 'ArrowUp': {
         event.preventDefault();
         const prevIndex = (currentIndex - 1 + items.length) % items.length;
         items[prevIndex]?.focus();
         break;
+      }
       case 'Enter':
-      case ' ':
+      case ' ': {
         event.preventDefault();
         menuItem.click();
         break;
-      case 'Escape':
+      }
+      case 'Escape': {
         event.preventDefault();
         this.closeActiveMenu();
         break;
+      }
     }
   }
 
@@ -492,19 +480,17 @@ class ContextMenuService {
     const rect = menu.getBoundingClientRect();
     const viewportWidth = globalThis.innerWidth;
     const viewportHeight = globalThis.innerHeight;
-    
+
     let x = position.x;
     let y = position.y;
-    
-    // Adjust if menu would go off-screen
+
     if (x + rect.width > viewportWidth) {
       x = viewportWidth - rect.width - 10;
     }
-    
     if (y + rect.height > viewportHeight) {
       y = viewportHeight - rect.height - 10;
     }
-    
+
     menu.style.left = `${Math.max(10, x)}px`;
     menu.style.top = `${Math.max(10, y)}px`;
   }
@@ -516,7 +502,6 @@ class ContextMenuService {
     }
   }
 
-  // File operation methods
   private async openFile(filePath: string): Promise<void> {
     await systemIntegration.openFile(filePath);
   }
@@ -529,15 +514,13 @@ class ContextMenuService {
     await systemIntegration.openApp(appId, { filePath });
   }
 
-  private async openWithSystemDefault(filePath: string): Promise<void> {
-    // Use File System Access API or fallback
+  private openWithSystemDefault(filePath: string): void {
     if ('showOpenFilePicker' in window) {
       globalThis.open(filePath, '_blank');
     }
   }
 
   private async chooseApplication(filePath: string): Promise<void> {
-    // Show app chooser dialog
     await systemIntegration.showAppChooser(filePath);
   }
 

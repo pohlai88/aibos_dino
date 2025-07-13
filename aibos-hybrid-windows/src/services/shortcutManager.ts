@@ -1,5 +1,4 @@
-import { useUIState } from '../store/uiState.ts';
-import { SearchProvider } from '../types/search.ts';
+import { SearchProvider, SearchResult } from '../types/search.ts';
 import { createCommandSearchResult } from './searchRegistry.ts';
 import { EnterpriseLogger } from './core/logger.ts';
 
@@ -209,11 +208,13 @@ class ShortcutManager {
   // Initialize the shortcut manager
   initialize(): void {
     if (this.isInitialized) return;
-
+    
     this.registerDefaultShortcuts();
-    this.setupGlobalEventListeners();
     this.createSearchProvider();
+    this.setupGlobalEventListeners();
+    
     this.isInitialized = true;
+    this.logger.info('ShortcutManager initialized', { component: 'ShortcutManager', action: 'initialize' });
   }
 
   // Create search provider for shortcuts
@@ -221,246 +222,42 @@ class ShortcutManager {
     this.searchProvider = {
       id: 'shortcuts',
       name: 'Keyboard Shortcuts',
-      description: 'Search and execute keyboard shortcuts',
-      priority: 3,
-      search: async (query: string, limit?: number) => {
-        const queryLower = query.toLowerCase();
-        return this.getAllShortcuts()
-          .filter(shortcut => 
-            shortcut.description.toLowerCase().includes(queryLower) ||
-            shortcut.key.toLowerCase().includes(queryLower) ||
-            shortcut.category.toLowerCase().includes(queryLower) ||
-            shortcut.tags?.some(tag => tag.toLowerCase().includes(queryLower))
-          )
-          .slice(0, limit || 10)
-          .map(shortcut => createCommandSearchResult(
+      search: (query: string, limit?: number): Promise<SearchResult[]> => {
+        const shortcuts = this.getAllShortcuts();
+        const filtered = shortcuts.filter(shortcut => 
+          shortcut.description.toLowerCase().includes(query.toLowerCase()) ||
+          shortcut.key.toLowerCase().includes(query.toLowerCase()) ||
+          shortcut.category.toLowerCase().includes(query.toLowerCase())
+        );
+        
+        return Promise.resolve(filtered.slice(0, limit || 10).map(shortcut => 
+          createCommandSearchResult(
             shortcut.id,
             shortcut.description,
-            shortcut.id,
-            () => {
-              if (shortcut.requiresConfirmation) {
-                const message = shortcut.confirmationMessage || `Execute ${shortcut.description}?`;
-                if (confirm(message)) {
-                  shortcut.action();
-                }
-              } else {
-                shortcut.action();
-              }
-            },
-            shortcut.key
-          ));
+            shortcut.key,
+            shortcut.action,
+            shortcut.helpText
+          )
+        ));
       }
     };
   }
 
-  // Get search provider
+  // Get the search provider
   getSearchProvider(): SearchProvider | undefined {
     return this.searchProvider;
   }
 
   // Register default system shortcuts
   private registerDefaultShortcuts(): void {
-    const { 
-      toggleSpotlight, 
-      toggleStartMenu, 
-      toggleUserMenu, 
-      openShortcutHelp,
-      closeShortcutHelp,
-      navigateHome, 
-      cycleTheme 
-    } = useUIState.getState();
-
-    // Global Navigation Shortcuts
-    this.register({
-      id: 'spotlight-toggle',
-      key: 'Ctrl+Space',
-      description: 'Toggle Spotlight Search',
-      category: 'Navigation',
-      icon: '🔍',
-      tags: ['search', 'spotlight', 'find'],
-      action: toggleSpotlight,
-      context: 'global',
-      priority: 100,
-      isSystem: true,
-      helpText: 'Quick access to search apps, files, and commands'
-    });
-
-    this.register({
-      id: 'start-menu-toggle',
-      key: 'Ctrl+Escape',
-      description: 'Toggle Start Menu',
-      category: 'Navigation',
-      icon: '🏠',
-      tags: ['start', 'menu', 'home'],
-      action: toggleStartMenu,
-      context: 'global',
-      priority: 100,
-      isSystem: true,
-      helpText: 'Access applications and system settings'
-    });
-
-    this.register({
-      id: 'home-navigate',
-      key: 'Ctrl+H',
-      description: 'Navigate to Home',
-      category: 'Navigation',
-      icon: '🏠',
-      tags: ['home', 'navigate'],
-      action: navigateHome,
-      context: 'global',
-      priority: 90,
-      isSystem: true,
-      helpText: 'Return to the main desktop'
-    });
-
-    this.register({
-      id: 'user-menu-toggle',
-      key: 'Ctrl+U',
-      description: 'Toggle User Menu',
-      category: 'User',
-      icon: '👤',
-      tags: ['user', 'profile', 'account'],
-      action: toggleUserMenu,
-      context: 'global',
-      priority: 90,
-      isSystem: true,
-      helpText: 'Access user settings and account information'
-    });
-
-    this.register({
-      id: 'theme-cycle',
-      key: 'Ctrl+T',
-      description: 'Cycle Theme (10 beautiful themes)',
-      category: 'Appearance',
-      icon: '🎨',
-      tags: ['theme', 'appearance', 'color'],
-      action: cycleTheme,
-      context: 'global',
-      priority: 80,
-      isSystem: true,
-      helpText: 'Switch between available themes'
-    });
-
-    this.register({
-      id: 'shortcut-help-open',
-      key: 'F1',
-      description: 'Show Keyboard Shortcuts',
-      category: 'Help',
-      icon: '❓',
-      tags: ['help', 'shortcuts', 'keyboard'],
-      action: openShortcutHelp,
-      context: 'global',
-      priority: 100,
-      isSystem: true,
-      helpText: 'Display all available keyboard shortcuts'
-    });
-
-    this.register({
-      id: 'shortcut-help-close',
-      key: 'Escape',
-      description: 'Close Shortcut Help',
-      category: 'Help',
-      icon: '❌',
-      tags: ['close', 'escape'],
-      action: closeShortcutHelp,
-      context: 'global',
-      priority: 100,
-      isSystem: true,
-      helpText: 'Close the shortcut help dialog'
-    });
-
-    // App Launcher Shortcuts
-    this.register({
-      id: 'app-notepad',
-      key: 'N',
-      description: 'Open Notepad',
-      category: 'Applications',
-      icon: '📝',
-      tags: ['notepad', 'text', 'editor'],
-      action: () => {
-        const { openWindow } = useUIState.getState();
-        openWindow('notepad');
-      },
-      context: 'global',
-      priority: 70,
-      helpText: 'Launch the text editor'
-    });
-
-    this.register({
-      id: 'app-files',
-      key: 'F',
-      description: 'Open Files',
-      category: 'Applications',
-      icon: '📁',
-      tags: ['files', 'explorer', 'browse'],
-      action: () => {
-        const { openWindow } = useUIState.getState();
-        openWindow('files');
-      },
-      context: 'global',
-      priority: 70,
-      helpText: 'Open the file manager'
-    });
-
-    this.register({
-      id: 'app-calculator',
-      key: 'C',
-      description: 'Open Calculator',
-      category: 'Applications',
-      icon: '🧮',
-      tags: ['calculator', 'math', 'compute'],
-      action: () => {
-        const { openWindow } = useUIState.getState();
-        openWindow('calculator');
-      },
-      context: 'global',
-      priority: 70,
-      helpText: 'Launch the calculator application'
-    });
-
-    this.register({
-      id: 'app-clock',
-      key: 'T',
-      description: 'Open Clock',
-      category: 'Applications',
-      icon: '🕐',
-      tags: ['clock', 'time', 'weather'],
-      action: () => {
-        const { openWindow } = useUIState.getState();
-        openWindow('clock');
-      },
-      context: 'global',
-      priority: 70,
-      helpText: 'Open the clock and weather app'
-    });
-
-    this.register({
-      id: 'app-themes',
-      key: 'H',
-      description: 'Open Theme Selector',
-      category: 'Applications',
-      icon: '🎨',
-      tags: ['themes', 'customize', 'appearance'],
-      action: () => {
-        const { openWindow } = useUIState.getState();
-        openWindow('themes');
-      },
-      context: 'global',
-      priority: 70,
-      helpText: 'Open the theme customization panel'
-    });
-
-    // Window Management Shortcuts
+    // Window management shortcuts
     this.register({
       id: 'window-close',
       key: 'Ctrl+W',
-      description: 'Close Active Window',
-      category: 'Windows',
-      icon: '❌',
-      tags: ['close', 'window', 'exit'],
+      description: 'Close Window',
+      category: 'Window Management',
       action: () => {
-        // This would need to be implemented based on your window management system
-        this.logger.info('Close active window', { component: 'ShortcutManager', action: 'windowClose' });
+        this.logger.info('Close window shortcut triggered', { component: 'ShortcutManager', action: 'closeWindow' });
       },
       context: 'global',
       priority: 60,
@@ -470,12 +267,10 @@ class ShortcutManager {
     this.register({
       id: 'window-minimize',
       key: 'Ctrl+M',
-      description: 'Minimize Active Window',
-      category: 'Windows',
-      icon: '➖',
-      tags: ['minimize', 'window', 'hide'],
+      description: 'Minimize Window',
+      category: 'Window Management',
       action: () => {
-        this.logger.info('Minimize active window', { component: 'ShortcutManager', action: 'windowMinimize' });
+        this.logger.info('Minimize window shortcut triggered', { component: 'ShortcutManager', action: 'minimizeWindow' });
       },
       context: 'global',
       priority: 60,
@@ -487,11 +282,17 @@ class ShortcutManager {
   private setupGlobalEventListeners(): void {
     const handleKeyDown = (event: KeyboardEvent) => {
       const context: ShortcutContext = {
-        isInputFocused: event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement,
-        activeApp: this.getActiveApp(),
-        activeComponent: this.getActiveComponent(),
-        activeWindow: this.getActiveWindow()
+        isInputFocused: event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement
       };
+      
+      const activeApp = this.getActiveApp();
+      if (activeApp) context.activeApp = activeApp;
+      
+      const activeComponent = this.getActiveComponent();
+      if (activeComponent) context.activeComponent = activeComponent;
+      
+      const activeWindow = this.getActiveWindow();
+      if (activeWindow) context.activeWindow = activeWindow;
 
       // Don't handle shortcuts when typing in input fields (except global ones)
       if (context.isInputFocused) {
@@ -532,7 +333,7 @@ class ShortcutManager {
 
     globalThis.addEventListener('keydown', handleKeyDown);
     this.eventListeners.set('keydown', () => {
-              globalThis.removeEventListener('keydown', handleKeyDown);
+      globalThis.removeEventListener('keydown', handleKeyDown);
     });
   }
 
@@ -670,14 +471,3 @@ export const useShortcutManager = () => {
     getStats: shortcutManager.getStats.bind(shortcutManager)
   };
 };
-import { SearchProvider, SearchResult as _SearchResult } from '../types/search.ts';
-import { createSearchResult as _createSearchResult } from './searchRegistry.ts';
-import { EnterpriseLogger } from './core/logger.ts';
-
-class _ShortcutManagerProvider implements SearchProvider {
-  private logger = new EnterpriseLogger();
-  
-  // Replace all logging calls:
-  // logInfo('message') → this.logger.info('message', { component: 'ShortcutManager', action: 'actionName' })
-  // logWarn('message') → this.logger.warn('message', { component: 'ShortcutManager', action: 'actionName' })
-}

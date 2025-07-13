@@ -185,7 +185,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
         if (themes.length > 0) {
           const currentIndex = themes.findIndex(t => t === theme);
           const nextIndex = currentIndex < themes.length - 1 ? currentIndex + 1 : 0;
-          handleThemeSelect(themes[nextIndex]);
+          if (themes[nextIndex] !== undefined) handleThemeSelect(themes[nextIndex]);
         }
         break;
     }
@@ -285,6 +285,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
             </div>
             {onClose && (
               <button
+                type="button"
                 onClick={onClose}
                 className="p-2 transition-colors rounded-lg hover:bg-opacity-20"
                 style={{ 
@@ -325,6 +326,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
               >
                 {(['gradient', 'full', 'minimal'] as const).map((mode) => (
                   <button
+                    type="button"
                     key={mode}
                     onClick={() => handlePreviewModeChange(mode)}
                     className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
@@ -360,6 +362,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
           <div className="flex flex-wrap gap-2">
             {categoryList.map((category) => (
               <button
+                type="button"
                 key={category}
                 onClick={() => setActiveCategory(category)}
                 style={themeStyles.categoryTab(activeCategory === category)}
@@ -485,11 +488,12 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
                 {themes.length} of {allThemes.length} theme{themes.length !== 1 ? 's' : ''}
               </span>
               <button
+                type="button"
                 onClick={() => {
                   if (themes.length > 0) {
                     const currentIndex = themes.findIndex(t => t === theme);
                     const nextIndex = currentIndex < themes.length - 1 ? currentIndex + 1 : 0;
-                    handleThemeSelect(themes[nextIndex]);
+                    if (themes[nextIndex] !== undefined) handleThemeSelect(themes[nextIndex]);
                   }
                 }}
                 disabled={themes.length === 0}

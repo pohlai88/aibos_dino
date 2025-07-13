@@ -30,7 +30,7 @@ async function validateSSOT(): Promise<ValidationResult> {
     try {
       registry = await loadCanonicalRegistry();
       logSuccess('Canonical registry loaded successfully');
-    } catch (error) {
+    } catch (_error) {
       errors.push('workspace-canonical.json not found or invalid');
       logError('workspace-canonical.json not found or invalid');
       return { isValid: false, errors, warnings };
@@ -57,16 +57,18 @@ async function validateSSOT(): Promise<ValidationResult> {
     }
 
     // Validate canonical files exist
-    if (registry.schemas?.files) {
-      for (const file of registry.schemas.files) {
+    const schemas = registry['schemas'] as { files?: string[] } | undefined;
+    if (schemas?.files) {
+      for (const file of schemas.files) {
         if (!(await fileExists(file))) {
           warnings.push(`Canonical schema file missing: ${file}`);
         }
       }
     }
 
-    if (registry.scripts?.files) {
-      for (const file of registry.scripts.files) {
+    const scripts = registry['scripts'] as { files?: string[] } | undefined;
+    if (scripts?.files) {
+      for (const file of scripts.files) {
         if (!(await fileExists(file))) {
           warnings.push(`Canonical script missing: ${file}`);
         }

@@ -87,18 +87,15 @@ export async function getDatabaseSchema(): Promise<Array<{table_name: string}>> 
  */
 export async function tableExists(tableName: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
       .eq('table_name', tableName)
       .single();
 
-    if (error) {
-      return false;
-    }
     return !!data;
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -169,9 +166,9 @@ export async function checkRlsPolicies(tableName: string): Promise<{hasRls: bool
 /**
  * Execute a raw SQL query (use with caution)
  * @param sql - SQL query to execute
- * @returns Promise<any> - Query result
+ * @returns Promise<unknown> - Query result
  */
-export async function executeQuery(sql: string): Promise<any> {
+export async function executeQuery(sql: string): Promise<unknown> {
   try {
     const { data, error } = await supabase.rpc('exec_sql', { sql_query: sql });
     

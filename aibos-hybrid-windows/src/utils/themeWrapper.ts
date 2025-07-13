@@ -181,17 +181,20 @@ export function getTheme(mode: ThemeMode) {
 export function getThemeColor(mode: ThemeMode, path: string): string {
   const themeColors = theme[mode].colors;
   const keys = path.split('.');
-  let value: Record<string, unknown> = themeColors as Record<string, unknown>;
+  let value: unknown = themeColors;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {
-      value = value[key];
+      value = (value as Record<string, unknown>)[key];
     } else {
       throw new Error(`Color path "${path}" not found in ${mode} theme`);
     }
   }
   
-  return value;
+  if (typeof value === 'string') {
+    return value;
+  }
+  throw new Error(`Color path "${path}" does not resolve to a string`);
 }
 
 /**

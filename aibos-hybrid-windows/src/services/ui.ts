@@ -1,4 +1,4 @@
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 export class UIService {
   private logger: EnterpriseLogger;
@@ -9,7 +9,7 @@ export class UIService {
     this.logger = new EnterpriseLogger();
   }
 
-  async initialize(): Promise<void> {
+  initialize(): void {
     this.logger.info('UIService initialized', {
       component: 'UIService',
       action: 'initialize'

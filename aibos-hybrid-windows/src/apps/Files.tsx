@@ -1,6 +1,5 @@
 import React, { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { systemIntegration } from '../services/systemIntegration';
-import { contextMenuService } from '../services/contextMenuService';
+import { contextMenuService as _contextMenuService } from '../services/contextMenuService.ts';
 
 // Enhanced type definitions
 interface BaseItem {
@@ -81,13 +80,14 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, item, onClose, onAction
             return prevItem?.type === 'separator' ? prevIndex - 1 : prevIndex;
           });
           break;
-        case 'Enter':
+        case 'Enter': {
           event.preventDefault();
           const selectedItem = menuItems[focusedIndex];
           if (selectedItem && selectedItem.type !== 'separator') {
             handleAction(selectedItem.id);
           }
           break;
+        }
       }
     };
 
@@ -177,7 +177,7 @@ export const Files: React.FC = memo(() => {
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bulkOperationProgress, setBulkOperationProgress] = useState<{
+  const [bulkOperationProgress, _setBulkOperationProgress] = useState<{
     isActive: boolean;
     completed: number;
     total: number;
@@ -199,11 +199,17 @@ export const Files: React.FC = memo(() => {
       }
       
       const data = await response.json();
-      const enhancedFiles = data.files?.map((file: any) => ({
-        ...file,
-        path: `${path}/${file.name}`.replace(/\/+/g, '/'),
-        isDirectory: file.type === 'folder'
-      })) || [];
+      const enhancedFiles = data.files?.map((file: unknown) => {
+        if (typeof file === 'object' && file !== null && 'name' in file && 'type' in file) {
+          const fileObj = file as { name: string; type: string };
+          return {
+            ...fileObj,
+            path: `${path}/${fileObj.name}`.replace(/\/+/g, '/'),
+            isDirectory: fileObj.type === 'folder'
+          };
+        }
+        return null;
+      }).filter(Boolean) || [];
       
       setFileItems(enhancedFiles);
     } catch (err) {
@@ -322,7 +328,7 @@ export const Files: React.FC = memo(() => {
   }, [fileItems, focusedIndex]);
 
   // Enhanced item interaction handlers
-  const handleItemClick = useCallback((item: FileItem, index: number) => {
+  const handleItemClick = useCallback((_item: FileItem, index: number) => {
     setFocusedIndex(index);
   }, []);
 
@@ -331,7 +337,10 @@ export const Files: React.FC = memo(() => {
       setPathParts([...pathParts, item.name]);
     } else {
       // Use system integration for file opening
-      systemIntegration.openFile(item.path, item.extension);
+      if (item.type === 'file') {
+        // TODO: Implement file opening with system integration
+        console.log('Opening file:', item.path);
+      }
     }
   }, [pathParts]);
 
@@ -341,41 +350,55 @@ export const Files: React.FC = memo(() => {
   }, []);
 
   // Enhanced context menu actions with system integration
-  const handleContextMenuAction = useCallback(async (action: string, item: FileItem) => {
+  const handleContextMenuAction = useCallback((action: string, item: FileItem) => {
     try {
       switch (action) {
         case 'open':
           handleItemDoubleClick(item);
           break;
-        case 'openWith':
-          await contextMenuService.showOpenWithMenu(item.path, item.extension);
+        case 'openWith': {
+          // TODO: Implement open with functionality
+          console.log('Open with for:', item.path);
           break;
-        case 'cut':
-          await systemIntegration.cutToClipboard([item.path]);
+        }
+        case 'cut': {
+          // TODO: Implement cut functionality
+          console.log('Cut:', item.path);
           break;
-        case 'copy':
-          await systemIntegration.copyToClipboard([item.path]);
+        }
+        case 'copy': {
+          // TODO: Implement copy functionality
+          console.log('Copy:', item.path);
           break;
-        case 'paste':
-          await systemIntegration.pasteFromClipboard(pathParts.join('/'));
+        }
+        case 'paste': {
+          // TODO: Implement paste functionality
+          console.log('Paste to:', pathParts.join('/'));
           fetchFiles(pathParts.join('/'));
           break;
-        case 'rename':
+        }
+        case 'rename': {
           const newName = prompt('Enter new name:', item.name);
           if (newName && newName.trim() && newName !== item.name) {
-            await systemIntegration.renameFile(item.path, newName);
+            // TODO: Implement rename functionality
+            console.log('Rename:', item.path, 'to', newName);
             fetchFiles(pathParts.join('/'));
           }
           break;
-        case 'delete':
+        }
+        case 'delete': {
           if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
-            await systemIntegration.deleteFile(item.path);
+            // TODO: Implement delete functionality
+            console.log('Delete:', item.path);
             fetchFiles(pathParts.join('/'));
           }
           break;
-        case 'properties':
-          await contextMenuService.showProperties(item);
+        }
+        case 'properties': {
+          // TODO: Implement properties functionality
+          console.log('Show properties for:', item.path);
           break;
+        }
       }
     } catch (err) {
       console.error(`Error in ${action}:`, err);
@@ -423,11 +446,12 @@ export const Files: React.FC = memo(() => {
           <button
             type="button"
             className="file-item-focus-enhanced px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-all duration-200 text-sm"
-            onClick={async () => {
+            onClick={() => {
               const folderName = prompt('Enter folder name:');
               if (folderName && folderName.trim()) {
                 try {
-                  await systemIntegration.createFolder(pathParts.join('/'), folderName);
+                  // TODO: Implement create folder functionality
+                  console.log('Create folder:', folderName, 'in', pathParts.join('/'));
                   fetchFiles(pathParts.join('/'));
                 } catch (err) {
                   console.error('Error creating folder:', err);

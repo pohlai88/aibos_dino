@@ -3,6 +3,7 @@
  * Tracks memory usage, type errors, and component performance
  */
 
+import React from 'react';
 import { MemoryTrackerImpl } from './memory-management.ts';
 
 interface PerformanceMetrics {
@@ -41,13 +42,15 @@ export class PerformanceMonitor {
     // Memory monitoring
     if ('memory' in performance) {
       setInterval(() => {
-        const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
-        this.metrics.memoryUsage = {
-          used: memory.usedJSHeapSize,
-          total: memory.totalJSHeapSize,
-          percentage: (memory.usedJSHeapSize / memory.totalJSHeapSize) * 100
-        };
-        this.notifyObservers();
+        const memory = (performance as Performance & { memory?: { usedJSHeapSize: number; totalJSHeapSize?: number } }).memory;
+        if (memory) {
+          this.metrics.memoryUsage = {
+            used: memory.usedJSHeapSize,
+            total: memory.totalJSHeapSize || memory.usedJSHeapSize * 2, // Fallback if total not available
+            percentage: memory.totalJSHeapSize ? (memory.usedJSHeapSize / memory.totalJSHeapSize) * 100 : 50
+          };
+          this.notifyObservers();
+        }
       }, 5000);
     }
 
@@ -78,11 +81,20 @@ export class PerformanceMonitor {
   }
 
   recordTypeError(error: string, component?: string): void {
-    this.metrics.typeErrors.push({
+    const errorEntry: {
+      timestamp: number;
+      error: string;
+      component?: string;
+    } = {
       timestamp: Date.now(),
       error,
-      component
-    });
+    };
+    
+    if (component !== undefined) {
+      errorEntry.component = component;
+    }
+    
+    this.metrics.typeErrors.push(errorEntry);
     
     // Keep only last 50 errors
     if (this.metrics.typeErrors.length > 50) {

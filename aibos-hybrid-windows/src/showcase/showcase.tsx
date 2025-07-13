@@ -2,18 +2,22 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Window } from '../components/Window.tsx';
 import { Dock } from '../components/Dock.tsx';
-import { TopBar } from '../components/TopBar.tsx';
+import TopBar from '../components/TopBar.tsx';
 import { Spotlight } from '../components/Spotlight.tsx';
 import { StartMenu } from '../components/StartMenu.tsx';
 import { Clock } from '../components/Clock.tsx';
-import { PropertiesDialog } from '../components/PropertiesDialog.tsx';
 import { Tooltip } from '../components/Tooltip.tsx';
 import { ThemeSelector } from '../components/ThemeSelector.tsx';
-import AppStore from '../components/AppStore.tsx';
-import TenantOnboarding from '../components/TenantOnboarding.tsx';
 import { ShortcutHelp } from '../components/ShortcutHelp.tsx';
 import { PerformanceDashboard } from '../components/PerformanceDashboard.tsx';
 import { Desktop as _Desktop } from '../components/Desktop.tsx';
+import { LazyLoading, preloadComponent } from '../utils/lazyLoading.tsx';
+import type { PropertiesDialogProps } from '../components/PropertiesDialog.tsx';
+import type { AppStoreProps } from '../components/AppStore.tsx';
+import type { TenantOnboardingProps } from '../components/TenantOnboarding.tsx';
+
+// Preload TenantOnboarding for critical path
+preloadComponent(() => import('../components/TenantOnboarding.tsx'));
 
 // Component showcase interface
 interface ComponentStory {
@@ -36,7 +40,7 @@ const componentStories: ComponentStory[] = [
     title: 'Window',
     description: 'Resizable window with traffic light buttons and glassmorphism effects',
     category: 'Window Management',
-    component: Window,
+    component: Window as unknown as React.ComponentType<Record<string, unknown>>,
     props: {
       id: 'showcase-window',
       title: 'Showcase Window',
@@ -60,7 +64,7 @@ const componentStories: ComponentStory[] = [
     title: 'Dock',
     description: 'Application dock with magnification and glassmorphism effects',
     category: 'Core Components',
-    component: Dock,
+    component: Dock as unknown as React.ComponentType<Record<string, unknown>>,
     variants: [
       {
         name: 'With Apps',
@@ -73,14 +77,14 @@ const componentStories: ComponentStory[] = [
     title: 'Top Bar',
     description: 'System top bar with theme toggle and system controls',
     category: 'Core Components',
-    component: TopBar,
+    component: TopBar as unknown as React.ComponentType<Record<string, unknown>>,
   },
   {
     id: 'spotlight',
     title: 'Spotlight',
     description: 'Global search with keyboard navigation and focus trapping',
     category: 'UI Components',
-    component: Spotlight,
+    component: Spotlight as unknown as React.ComponentType<Record<string, unknown>>,
     props: { isVisible: true },
   },
   {
@@ -88,7 +92,7 @@ const componentStories: ComponentStory[] = [
     title: 'Start Menu',
     description: 'Application launcher with categories and search',
     category: 'Core Components',
-    component: StartMenu,
+    component: StartMenu as unknown as React.ComponentType<Record<string, unknown>>,
     props: { isVisible: true },
   },
   {
@@ -96,25 +100,34 @@ const componentStories: ComponentStory[] = [
     title: 'Clock',
     description: 'Real-time clock with weather and timezone support',
     category: 'Applications',
-    component: Clock,
+    component: Clock as unknown as React.ComponentType<Record<string, unknown>>,
   },
   {
     id: 'properties-dialog',
     title: 'Properties Dialog',
     description: 'File properties dialog with form validation',
     category: 'UI Components',
-    component: PropertiesDialog,
+    component: (props: PropertiesDialogProps) => (
+      <LazyLoading
+        loader={() => import('../components/PropertiesDialog.tsx').then(m => ({ default: m.PropertiesDialog }))}
+        loadingFallback={<div>Loading Properties Dialog...</div>}
+        componentProps={props}
+      />
+    ),
     props: {
       isVisible: true,
-      file: {
+      item: {
+        id: 'file-1',
         name: 'example.txt',
-        size: 1024,
-        created: new Date(),
-        modified: new Date(),
-        type: 'text/plain'
+        icon: '',
+        type: 'file',
+        size: '1 KB',
+        modified: new Date().toISOString(),
+        extension: 'txt',
       },
       onClose: () => {},
-      onSave: () => {}
+      onRename: (_name: string) => {},
+      onDelete: () => {},
     },
   },
   {
@@ -122,7 +135,7 @@ const componentStories: ComponentStory[] = [
     title: 'Tooltip',
     description: 'Accessible tooltip with positioning and ARIA support',
     category: 'UI Components',
-    component: Tooltip,
+    component: Tooltip as unknown as React.ComponentType<Record<string, unknown>>,
     props: {
       content: 'This is a tooltip',
       children: <button type="button">Hover me</button>
@@ -133,7 +146,7 @@ const componentStories: ComponentStory[] = [
     title: 'Theme Selector',
     description: 'Theme selection with preview and accessibility',
     category: 'UI Components',
-    component: ThemeSelector,
+    component: ThemeSelector as unknown as React.ComponentType<Record<string, unknown>>,
     props: { isVisible: true, onClose: () => {} },
   },
   {
@@ -141,23 +154,45 @@ const componentStories: ComponentStory[] = [
     title: 'App Store',
     description: 'Application marketplace with installation workflow',
     category: 'Applications',
-    component: AppStore,
-    props: { isVisible: true, onClose: () => {} },
+    component: (props: AppStoreProps) => (
+      <LazyLoading
+        loader={() => import('../components/AppStore.tsx')}
+        loadingFallback={<div>Loading App Store...</div>}
+        componentProps={props}
+      />
+    ),
+    props: {
+      tenantId: 'demo-tenant',
+      onAppInstalled: () => {},
+      onAppUninstalled: () => {},
+      onAppOpen: () => {},
+    },
   },
   {
     id: 'tenant-onboarding',
     title: 'Tenant Onboarding',
     description: 'Multi-step onboarding with form validation',
     category: 'Applications',
-    component: TenantOnboarding,
-    props: { isVisible: true, onClose: () => {} },
+    component: (props: TenantOnboardingProps) => (
+      <LazyLoading
+        loader={() => import('../components/TenantOnboarding.tsx')}
+        loadingFallback={<div>Loading Onboarding...</div>}
+        componentProps={props}
+        preload={true}
+      />
+    ),
+    props: {
+      onTenantCreated: () => {},
+      onSkip: () => {},
+      onComplete: () => {},
+    },
   },
   {
     id: 'shortcut-help',
     title: 'Shortcut Help',
     description: 'Keyboard shortcuts guide with search and categories',
     category: 'UI Components',
-    component: ShortcutHelp,
+    component: ShortcutHelp as unknown as React.ComponentType<Record<string, unknown>>,
     props: { isVisible: true, onClose: () => {} },
   },
   {
@@ -165,7 +200,7 @@ const componentStories: ComponentStory[] = [
     title: 'Performance Dashboard',
     description: 'Real-time performance monitoring with metrics',
     category: 'Applications',
-    component: PerformanceDashboard,
+    component: PerformanceDashboard as unknown as React.ComponentType<Record<string, unknown>>,
   },
 ];
 

@@ -494,17 +494,20 @@ export const designTokens = {
  */
 export function getColor(path: ColorPaths): string {
   const keys = path.split('.');
-  let value: Record<string, unknown> = colors as Record<string, unknown>;
+  let value: unknown = colors;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {
-      value = value[key];
+      value = (value as Record<string, unknown>)[key];
     } else {
       throw new Error(`Color path "${path}" not found`);
     }
   }
   
-  return value;
+  if (typeof value === 'string') {
+    return value;
+  }
+  throw new Error(`Color path "${path}" does not resolve to a string`);
 }
 
 /**
@@ -512,17 +515,20 @@ export function getColor(path: ColorPaths): string {
  */
 export function getGradient(path: GradientPaths): string {
   const keys = path.split('.');
-  let value: Record<string, unknown> = gradients as Record<string, unknown>;
+  let value: unknown = gradients;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {
-      value = value[key];
+      value = (value as Record<string, unknown>)[key];
     } else {
       throw new Error(`Gradient path "${path}" not found`);
     }
   }
   
-  return value;
+  if (typeof value === 'string') {
+    return value;
+  }
+  throw new Error(`Gradient path "${path}" does not resolve to a string`);
 }
 
 /**

@@ -416,14 +416,25 @@ class WindowSnappingManager {
     newX = Math.max(0, Math.min(newX, screenWidth - newWidth));
     newY = Math.max(0, Math.min(newY, screenHeight - newHeight));
 
-    return {
+    const result: SnapResult = {
       snapped,
       position: { x: newX, y: newY },
-      size: { width: newWidth, height: newHeight },
-      zone: snapZone || undefined,
-      indicator,
-      preview
+      size: { width: newWidth, height: newHeight }
     };
+
+    if (snapZone) {
+      result.zone = snapZone;
+    }
+
+    if (indicator) {
+      result.indicator = indicator;
+    }
+
+    if (preview) {
+      result.preview = preview;
+    }
+
+    return result;
   }
 
   // NEW: Debounced snap calculation for performance

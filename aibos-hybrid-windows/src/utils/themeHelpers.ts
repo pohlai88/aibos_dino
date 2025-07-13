@@ -1,5 +1,6 @@
 import { theme, ThemeMode } from './themeWrapper.ts';
 import type { ColorPaths, GradientPaths } from './designTokens.ts';
+import type { CSSProperties } from 'https://esm.sh/react@18.2.0';
 
 // ============================================================================
 // STRONGLY TYPED THEME HELPERS
@@ -145,7 +146,7 @@ export function createGlassStyle(
   opacity: '10' | '20' | '30' | '40' | '50' | '60' | '70' | '80' | '90' = '20',
   mode: ThemeMode = 'light',
   blur: keyof typeof theme.light.blur = 'md'
-): React.CSSProperties {
+): CSSProperties {
   const nextOpacity = String(Number(opacity) + 10) as '10' | '20' | '30' | '40' | '50' | '60' | '70' | '80' | '90';
   return {
     backgroundColor: getColorVarValue(`glass.${mode}.${opacity}` as ColorPaths, mode),
@@ -161,7 +162,7 @@ export function createGlassStyle(
 export function createGradientStyle(
   path: GradientPaths,
   mode: ThemeMode = 'light'
-): React.CSSProperties {
+): CSSProperties {
   return {
     backgroundImage: getGradientVarValue(path, mode),
   };
@@ -173,7 +174,7 @@ export function createGradientStyle(
 export function createGlassButtonStyle(
   variant: 'primary' | 'secondary' | 'success' | 'warning' | 'error' = 'primary',
   mode: ThemeMode = 'light'
-): React.CSSProperties {
+): CSSProperties {
   const baseStyle = createGlassStyle('30', mode, 'sm');
   
   const variantColors = {

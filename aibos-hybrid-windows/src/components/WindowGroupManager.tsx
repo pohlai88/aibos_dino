@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useUIState } from '../store/uiState.ts';
+import { motion, AnimatePresence as _AnimatePresence } from 'framer-motion';
+import type { WindowState, WindowGroup } from '../store/uiState.ts';
 import { getColor } from '../utils/themeHelpers.ts';
 import { useDeviceInfo } from '../utils/responsive.ts';
+import { useUIState } from '../store/uiState.ts';
 
 interface WindowGroupManagerProps {
   isVisible: boolean;
@@ -22,19 +23,19 @@ export const WindowGroupManager: React.FC<WindowGroupManagerProps> = ({ isVisibl
   } = useUIState();
   
   const deviceInfo = useDeviceInfo();
-  const { isMobile, isTablet } = deviceInfo;
+  const { isMobile, isTablet: _isTablet } = deviceInfo;
   
   const [selectedWindows, setSelectedWindows] = useState<Set<string>>(new Set());
   const [newGroupName, setNewGroupName] = useState('');
 
   // Get ungrouped windows
   const ungroupedWindows = useMemo(() => {
-    return openWindows.filter(win => !win.groupId);
+    return openWindows.filter((win: WindowState) => !win.groupId);
   }, [openWindows]);
 
   // Get grouped windows
-  const groupedWindows = useMemo(() => {
-    return openWindows.filter(win => win.groupId);
+  const _groupedWindows = useMemo(() => {
+    return openWindows.filter((win: WindowState) => win.groupId);
   }, [openWindows]);
 
   const handleWindowSelect = useCallback((windowId: string) => {
@@ -81,6 +82,8 @@ export const WindowGroupManager: React.FC<WindowGroupManagerProps> = ({ isVisibl
     typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
+
+  const windowGroupArray = Object.values(windowGroups) as WindowGroup[];
 
   if (!isVisible) return null;
 
@@ -152,12 +155,12 @@ export const WindowGroupManager: React.FC<WindowGroupManagerProps> = ({ isVisibl
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                {ungroupedWindows.map((window) => (
+                {ungroupedWindows.map((win: WindowState) => (
                   <label
-                    key={window.id}
+                    key={win.id}
                     className={`
                       flex items-center p-2 rounded cursor-pointer transition-colors
-                      ${selectedWindows.has(window.id)
+                      ${selectedWindows.has(win.id)
                         ? 'bg-blue-100 dark:bg-blue-900'
                         : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
                       }
@@ -165,12 +168,12 @@ export const WindowGroupManager: React.FC<WindowGroupManagerProps> = ({ isVisibl
                   >
                     <input
                       type="checkbox"
-                      checked={selectedWindows.has(window.id)}
-                      onChange={() => handleWindowSelect(window.id)}
+                      checked={selectedWindows.has(win.id)}
+                      onChange={() => handleWindowSelect(win.id)}
                       className="mr-2"
                     />
                     <span className="text-sm text-gray-900 dark:text-white truncate">
-                      {window.component}
+                      {win.component}
                     </span>
                   </label>
                 ))}
@@ -194,8 +197,8 @@ export const WindowGroupManager: React.FC<WindowGroupManagerProps> = ({ isVisibl
             </h3>
             
             <div className="space-y-2">
-              {Object.values(windowGroups).map((group) => {
-                const groupWindows = openWindows.filter(win => group.windowIds.includes(win.id));
+              {windowGroupArray.map((group: WindowGroup) => {
+                const groupWindows = openWindows.filter((win: WindowState) => group.windowIds.includes(win.id));
                 return (
                   <div
                     key={group.id}
@@ -225,7 +228,7 @@ export const WindowGroupManager: React.FC<WindowGroupManagerProps> = ({ isVisibl
                     </div>
                     
                     <div className="space-y-1">
-                      {groupWindows.map((window) => (
+                      {groupWindows.map((window: WindowState) => (
                         <div
                           key={window.id}
                           className="flex items-center justify-between p-1 text-sm"

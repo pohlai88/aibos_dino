@@ -55,7 +55,7 @@ function getTenantId(req: Request): string {
 }
 
 // Check storage quotas for tenant
-async function checkStorageQuota(tenantId: string, newNoteSize: number = 0): Promise<{ allowed: boolean; reason?: string; currentUsage: any }> {
+async function checkStorageQuota(tenantId: string, newNoteSize: number = 0): Promise<{ allowed: boolean; reason?: string; currentUsage: Record<string, unknown> | null }> {
   try {
     // Get tenant subscription tier
     const { data: tenant, error: tenantError } = await supabase
@@ -260,7 +260,7 @@ async function handleAPI(req: Request, path: string): Promise<Response> {
       return new Response(
         JSON.stringify({
           quota: quotaCheck.currentUsage,
-          limits: quotaCheck.currentUsage?.limits
+          limits: quotaCheck.currentUsage?.['limits']
         }),
         { 
           headers: { 
@@ -471,7 +471,7 @@ Deno.serve(async (req) => {
       }), {
         headers: { "Content-Type": "application/json" }
       });
-    } catch (error) {
+    } catch (_error) {
       return new Response(JSON.stringify({
         error: "Health check failed",
         supabaseStatus: "error"

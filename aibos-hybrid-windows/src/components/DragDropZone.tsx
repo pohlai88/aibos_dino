@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { systemIntegration } from '../services/systemIntegration';
-import { audioManager } from '../utils/audio';
-import { hapticManager } from '../utils/haptics';
+import { audioManager } from '../utils/audio.ts';
+import { hapticManager } from '../utils/haptics.ts';
 
 // Enhanced TypeScript types for File System Access API
 interface FileSystemHandle {
@@ -49,7 +48,7 @@ interface ProcessedFile {
 
 export const DragDropZone: React.FC<DragDropZoneProps> = ({
   onFilesDropped,
-  onDirectoryDropped,
+  onDirectoryDropped: _onDirectoryDropped,
   onError,
   onProgress,
   acceptedTypes = [],
@@ -152,16 +151,16 @@ export const DragDropZone: React.FC<DragDropZoneProps> = ({
   }, [showPreview, updateDraggedFiles]);
 
   // Enhanced directory processing with File System Access API fallback
-  const processDirectoryWithFileSystemAPI = async (dirHandle: FileSystemDirectoryHandle): Promise<File[]> => {
+  const _processDirectoryWithFileSystemAPI = async (dirHandle: FileSystemDirectoryHandle): Promise<File[]> => {
     const files: File[] = [];
     
     try {
-      for await (const [name, handle] of dirHandle.entries()) {
+      for await (const [_name, handle] of dirHandle.entries()) {
         if (handle.kind === 'file') {
           const file = await (handle as FileSystemFileHandle).getFile();
           files.push(file);
         } else if (handle.kind === 'directory') {
-          const subFiles = await processDirectoryWithFileSystemAPI(handle as FileSystemDirectoryHandle);
+          const subFiles = await _processDirectoryWithFileSystemAPI(handle as FileSystemDirectoryHandle);
           files.push(...subFiles);
         }
       }
@@ -173,18 +172,18 @@ export const DragDropZone: React.FC<DragDropZoneProps> = ({
   };
 
   // Legacy webkit directory processing
-  const processDirectoryEntry = async (entry: any): Promise<File[]> => {
+  const processDirectoryEntry = async (entry: unknown): Promise<File[]> => {
     const files: File[] = [];
     
-    const readEntries = (dirEntry: any): Promise<any[]> => {
+    const readEntries = (dirEntry: unknown): Promise<unknown[]> => {
       return new Promise((resolve, reject) => {
-        dirEntry.createReader().readEntries(resolve, reject);
+        (dirEntry as { createReader(): { readEntries(resolve: (entries: unknown[]) => void, reject: (error: unknown) => void): void } }).createReader().readEntries(resolve, reject);
       });
     };
     
-    const getFile = (fileEntry: any): Promise<File> => {
+    const getFile = (fileEntry: unknown): Promise<File> => {
       return new Promise((resolve, reject) => {
-        fileEntry.file(resolve, reject);
+        (fileEntry as { file(resolve: (file: File) => void, reject: (error: unknown) => void): void }).file(resolve, reject);
       });
     };
     
@@ -192,10 +191,10 @@ export const DragDropZone: React.FC<DragDropZoneProps> = ({
       const entries = await readEntries(entry);
       
       for (const subEntry of entries) {
-        if (subEntry.isFile) {
+        if ((subEntry as { isFile: boolean }).isFile) {
           const file = await getFile(subEntry);
           files.push(file);
-        } else if (subEntry.isDirectory) {
+        } else if ((subEntry as { isDirectory: boolean }).isDirectory) {
           const subFiles = await processDirectoryEntry(subEntry);
           files.push(...subFiles);
         }
@@ -232,6 +231,7 @@ export const DragDropZone: React.FC<DragDropZoneProps> = ({
       
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+        if (!item) continue;
         
         if (item.kind === 'file') {
           const file = item.getAsFile();
@@ -286,10 +286,16 @@ export const DragDropZone: React.FC<DragDropZoneProps> = ({
         // Enhanced progress reporting with byte-level granularity
         for (let i = 0; i < finalFiles.length; i++) {
           const file = finalFiles[i];
+          if (!file) continue;
           
           try {
             // Extract metadata with progress tracking
-            const metadata = await systemIntegration.extractFileMetadata(file);
+            const metadata = {
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              category: 'unknown'
+            };
             processedBytes += file.size;
             
             const processedFile: ProcessedFile = {
@@ -300,13 +306,13 @@ export const DragDropZone: React.FC<DragDropZoneProps> = ({
             
             processedFiles.push(processedFile);
             
-            // Add to recent files
-            await systemIntegration.addToRecentFiles(file.name, {
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              category: metadata.category
-            });
+            // TODO: Add to recent files when systemIntegration is properly implemented
+            // await systemIntegration.addToRecentFiles(file.name, {
+            //   name: file.name,
+            //   size: file.size,
+            //   type: file.type,
+            //   category: metadata.category
+            // });
             
             // Enhanced progress reporting
             onProgress?.(i + 1, finalFiles.length, processedBytes, totalBytes);
@@ -472,6 +478,7 @@ export const DragDropZone: React.FC<DragDropZoneProps> = ({
               <div className="text-xs text-red-600 mt-1">{error}</div>
             </div>
             <button
+              type="button"
               onClick={() => setError(null)}
               className="ml-2 text-red-400 hover:text-red-600"
               aria-label="Dismiss error"

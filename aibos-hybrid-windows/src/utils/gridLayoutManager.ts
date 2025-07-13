@@ -209,7 +209,7 @@ class GridLayoutManager {
     
     const cell = this.activeLayout.cells.find(c => c.windowId === windowId);
     if (cell) {
-      cell.windowId = undefined;
+      delete cell.windowId;
       cell.isOccupied = false;
       return true;
     }
@@ -246,8 +246,10 @@ class GridLayoutManager {
     windowIds.forEach((windowId, index) => {
       if (index < availableCells.length) {
         const cell = availableCells[index];
-        this.assignWindowToCell(windowId, cell.id);
-        assignments.set(windowId, cell);
+        if (cell) {
+          this.assignWindowToCell(windowId, cell.id);
+          assignments.set(windowId, cell);
+        }
       }
     });
 
@@ -326,5 +328,4 @@ class GridLayoutManager {
   }
 }
 
-export const gridLayoutManager = new GridLayoutManager();
-export type { GridLayout, GridCell, WorkspaceTemplate, LayoutPreset }; 
+export const gridLayoutManager = new GridLayoutManager(); 

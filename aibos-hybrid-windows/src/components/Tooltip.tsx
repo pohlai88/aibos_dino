@@ -266,6 +266,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       
       return () => globalThis.removeEventListener('resize', handleResize);
     }
+    return undefined;
   }, [isVisible, checkViewportPosition]);
 
   if (disabled) {

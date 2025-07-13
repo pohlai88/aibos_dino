@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useUIState } from '../store/uiState.ts';
 import { getColor } from '../utils/themeHelpers.ts';
 import { useDeviceInfo } from '../utils/responsive.ts';
-import { gridLayoutManager, type GridLayout, type GridCell } from '../utils/gridLayoutManager.ts';
+import { gridLayoutManager } from '../utils/gridLayoutManager.ts';
 
 interface GridLayoutManagerProps {
   isVisible: boolean;
@@ -13,7 +13,7 @@ interface GridLayoutManagerProps {
 export const GridLayoutManager: React.FC<GridLayoutManagerProps> = ({ isVisible, onClose }) => {
   const { colorMode, openWindows } = useUIState();
   const deviceInfo = useDeviceInfo();
-  const { isMobile, isTablet } = deviceInfo;
+  const { isMobile } = deviceInfo;
   
   const [selectedLayout, setSelectedLayout] = useState<string>('grid-2x2');
   const [selectedWindows, setSelectedWindows] = useState<Set<string>>(new Set());
@@ -21,7 +21,7 @@ export const GridLayoutManager: React.FC<GridLayoutManagerProps> = ({ isVisible,
   const layouts = useMemo(() => gridLayoutManager.getAllLayouts(), []);
   const activeLayout = useMemo(() => gridLayoutManager.getActiveLayout(), []);
   const availableWindows = useMemo(() => 
-    openWindows.filter(win => !win.groupId), [openWindows]
+    openWindows.filter((win: { groupId?: string }) => !win.groupId), [openWindows]
   );
 
   const handleLayoutSelect = useCallback((layoutId: string) => {
@@ -57,7 +57,7 @@ export const GridLayoutManager: React.FC<GridLayoutManagerProps> = ({ isVisible,
     const availableCells = gridLayoutManager.getAvailableCells();
     
     windowIds.forEach((windowId, index) => {
-      if (index < availableCells.length) {
+      if (index < availableCells.length && availableCells[index]) {
         gridLayoutManager.assignWindowToCell(windowId, availableCells[index].id);
       }
     });
@@ -201,7 +201,7 @@ export const GridLayoutManager: React.FC<GridLayoutManagerProps> = ({ isVisible,
             </h3>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-              {availableWindows.map((window) => (
+              {availableWindows.map((window: { id: string; component: string }) => (
                 <label
                   key={window.id}
                   className={`

@@ -28,16 +28,18 @@ export const SystemTray: React.FC<SystemTrayProps> = memo(({ className = '' }) =
   }, [trayItems]);
 
   // Handle tray icon click
-  const handleTrayClick = useCallback((event: React.MouseEvent) => {
-    if (trayItems.length === 0) return;
-    
+  const handleTrayClick = useCallback((event: React.MouseEvent<HTMLButtonElement>): void => {
+    if (trayItems.length === 0) {
+      return;
+    }
+
     const rect = event.currentTarget.getBoundingClientRect();
     setMenuPosition({
       x: rect.left,
       y: rect.bottom + 8
     });
-    setIsMenuOpen(!isMenuOpen);
-  }, [trayItems.length, isMenuOpen]);
+    setIsMenuOpen(prev => !prev);
+  }, [trayItems.length]);
 
   // Handle menu item click
   const handleMenuItemClick = useCallback((item: TrayMenu) => {
@@ -47,7 +49,7 @@ export const SystemTray: React.FC<SystemTrayProps> = memo(({ className = '' }) =
 
   // Close menu when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (_event: MouseEvent) => {
       if (isMenuOpen) {
         setIsMenuOpen(false);
       }
@@ -57,6 +59,7 @@ export const SystemTray: React.FC<SystemTrayProps> = memo(({ className = '' }) =
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
+    return undefined;
   }, [isMenuOpen]);
 
   // Don't render if no tray items
@@ -110,7 +113,7 @@ export const SystemTray: React.FC<SystemTrayProps> = memo(({ className = '' }) =
             aria-label="System tray menu"
           >
             <div className="p-2">
-              {menuItems.map((item, index) => {
+              {menuItems.map((item, _index) => {
                 // Render separator
                 if (item.title === '') {
                   return (

@@ -437,6 +437,7 @@ export const Notepad = memo(() => {
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => deleteNote(note.id)}
                   className="ml-2 px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
                 >

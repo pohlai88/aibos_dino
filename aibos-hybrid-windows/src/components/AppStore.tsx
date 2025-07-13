@@ -4,7 +4,7 @@ import { getColor } from '../utils/themeHelpers.ts';
 import { useUIState } from '../store/uiState.ts';
 import { animation } from '../utils/designTokens.ts';
 
-interface AppStoreProps {
+export interface AppStoreProps {
   tenantId: string;
   onAppInstalled?: (app: App) => void;
   onAppUninstalled?: (appId: string) => void;
@@ -194,14 +194,16 @@ const AppStore: React.FC<AppStoreProps> = ({
         
         // Show success notification with sanitized text
         const sanitizedName = app.name.replace(/[<>]/g, ''); // Basic HTML escape
-        await aibosPlatformService.createNotification(
-          tenantId,
-          (await aibosPlatformService.getCurrentUser())?.id || '',
-          'success',
-          'App Installed',
-          `${sanitizedName} has been successfully installed!`,
-          app.id
-        );
+        await aibosPlatformService.createNotification({
+          tenant_id: tenantId,
+          user_id: (await aibosPlatformService.getCurrentUser())?.id || '',
+          type: 'success',
+          title: 'App Installed',
+          message: `${sanitizedName} has been successfully installed!`,
+          app_id: app.id,
+          data: {},
+          is_read: false
+        });
       } else {
         setError(response.error || 'Failed to install app');
       }
@@ -218,7 +220,7 @@ const AppStore: React.FC<AppStoreProps> = ({
     try {
       setError(null);
 
-      const response = await aibosPlatformService.uninstallApp(installation.id);
+      const response = await aibosPlatformService.uninstallApp(tenantId, installation.app_id);
       
       if (response.success) {
         // Refresh installed apps
@@ -227,14 +229,16 @@ const AppStore: React.FC<AppStoreProps> = ({
         onAppUninstalled?.(installation.app_id);
         
         // Show success notification
-        await aibosPlatformService.createNotification(
-          tenantId,
-          (await aibosPlatformService.getCurrentUser())?.id || '',
-          'info',
-          'App Uninstalled',
-          'App has been successfully uninstalled.',
-          installation.app_id
-        );
+        await aibosPlatformService.createNotification({
+          tenant_id: tenantId,
+          user_id: (await aibosPlatformService.getCurrentUser())?.id || '',
+          type: 'info',
+          title: 'App Uninstalled',
+          message: 'App has been successfully uninstalled.',
+          app_id: installation.app_id,
+          data: {},
+          is_read: false
+        });
       } else {
         setError(response.error || 'Failed to uninstall app');
       }

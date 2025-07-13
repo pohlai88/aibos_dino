@@ -10,7 +10,6 @@ import {
 import {
   logInfo,
   logWarn,
-  logError,
   logSuccess
 } from '../modules/logging.ts';
 
@@ -148,12 +147,12 @@ class CanonicalCleanup {
 
   private async organizeDocs() {
     await ensureDir("docs");
-    const mappings = [
+    const mappings: [string, string][] = [
       ["aibos-requirement.md", "aibos-requirements.md"],
       ["10min-challenge.md", "10min-challenge.md"],
     ];
     for (const [from, to] of mappings) {
-      if (await fileExists(from)) {
+      if (typeof from === 'string' && typeof to === 'string' && await fileExists(from)) {
         if (this.dryRun) {
           logWarn(`[dry-run] Would move: ${from} → docs/${to}`);
           continue;
@@ -164,25 +163,25 @@ class CanonicalCleanup {
     }
   }
 
-  private async createDirs() {
+  private createDirs() {
     const dirs = ["docs", "src", "modules", "apps"];
     for (const dir of dirs) {
-      await ensureDir(dir);
+      ensureDir(dir);
       logInfo(`Ensured directory: ${dir}`);
     }
   }
 
-  private async updateGitignore() {
+  private updateGitignore() {
     // No-op for now, could use unified file ops if needed
     logInfo("Checked .gitignore (no changes made)");
   }
 
-  private async runSSOTCheck() {
+  private runSSOTCheck() {
     // Optionally run validate-ssot.ts using Deno.run or import
     logInfo("SSOT check complete (placeholder)");
   }
 
-  private async report() {
+  private report() {
     logInfo("\nCleanup Report:");
     logInfo(`Removed files: ${this.result.removedFiles.length}`);
     logInfo(`Preserved files: ${this.result.preservedFiles.length}`);

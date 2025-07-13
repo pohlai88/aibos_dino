@@ -9,17 +9,17 @@ import { animation } from '../utils/designTokens.ts';
 import { useDeviceInfo } from '../utils/responsive.ts';
 
 // Simple debounce utility for Deno compatibility
-function debounce<T extends (...args: any[]) => void>(fn: T, wait: number) {
+function debounce(fn: (q: string) => void, wait: number): ((q: string) => void) & { cancel: () => void } {
   let timeout: ReturnType<typeof setTimeout> | null = null;
-  const debounced = (...args: Parameters<T>) => {
+  const debounced = (q: string) => {
     if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => fn(...args), wait);
+    timeout = setTimeout(() => fn(q), wait);
   };
   debounced.cancel = () => {
     if (timeout) clearTimeout(timeout);
     timeout = null;
   };
-  return debounced as T & { cancel: () => void };
+  return debounced;
 }
 
 import type { SearchResult } from '../types/search.ts';
@@ -97,7 +97,7 @@ export const Spotlight = memo(() => {
       setResults([]);
       
       // Load quick access items
-      searchRegistry.getQuickAccess(8).then(items => {
+      searchRegistry.getQuickAccess(8).then((items: SearchResult[]) => {
         setQuickAccess(items);
       });
 
@@ -118,12 +118,12 @@ export const Spotlight = memo(() => {
     setResults([]);
     let allResults: SearchResult[] = [];
     
-    searchRegistry.searchStream(q, (partial) => {
+    searchRegistry.searchStream(q, (partial: SearchResult[]) => {
       allResults = [...allResults, ...partial];
       // Remove duplicates by id
       const unique = Array.from(new Map(allResults.map(r => [r.id, r])).values());
       setResults(unique.slice(0, resultLimit));
-    }, resultLimit).then(finalResults => {
+    }, resultLimit).then((finalResults: SearchResult[]) => {
       setIsLoading(false);
       setResults(finalResults.slice(0, resultLimit));
       setSelectedIndex(0);
@@ -271,6 +271,7 @@ export const Spotlight = memo(() => {
               />
             </div>
             <button
+              type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${
                 isMobile ? 'p-1' : 'p-2'
@@ -280,6 +281,7 @@ export const Spotlight = memo(() => {
               ⚙️
             </button>
             <button
+              type="button"
               onClick={closeSpotlight}
               className={`text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${
                 isMobile ? 'p-1' : 'p-2'

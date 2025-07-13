@@ -1,5 +1,5 @@
-import { systemIntegration } from './systemIntegration';
-import { storageService } from './storageService';
+import { systemIntegration } from './systemIntegration.ts';
+import { storageService } from './storageService.ts';
 
 export interface RecentFile {
   path: string;
@@ -15,9 +15,9 @@ class RecentFilesManagerService {
   private maxRecentFiles = 50;
   private pinnedFiles: Set<string> = new Set();
 
-  async getRecentFiles(limit?: number): Promise<RecentFile[]> {
-    const files = systemIntegration.getRecentFiles();
-    const sorted = files.sort((a, b) => 
+  getRecentFiles(limit?: number): RecentFile[] {
+    const files: RecentFile[] = systemIntegration.getRecentFiles();
+    const sorted = files.sort((a: RecentFile, b: RecentFile) => 
       new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()
     );
     return limit ? sorted.slice(0, limit) : sorted;

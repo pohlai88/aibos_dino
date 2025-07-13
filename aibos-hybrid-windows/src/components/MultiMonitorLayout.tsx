@@ -87,6 +87,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
           <div className="text-4xl mb-4">⚠️</div>
           <div className="text-lg font-semibold mb-2">{error}</div>
           <button
+            type="button"
             onClick={onClose}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring focus:ring-blue-400"
           >
@@ -104,7 +105,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
   const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(max, val));
 
   // Real window reposition logic (stub if not present)
-  const moveWindowToMonitor = (windowId: string, monitorId: string) => {
+  const _moveWindowToMonitor = (windowId: string, monitorId: string) => {
     const monitor = monitorManager.getMonitor(monitorId);
     if (!monitor) {
       console.warn(`Monitor ${monitorId} no longer exists`);
@@ -121,7 +122,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
       console.warn(`Monitor ${monitorId} no longer exists`);
       return;
     }
-    openWindows.forEach((window) => {
+    openWindows.forEach((window: { id: string; component: string; position: { x: number; y: number } }) => {
       // TODO: Integrate with real window manager
       // windowManager.moveWindow(window.id, monitor.bounds.x + 50 + (index * 50), monitor.bounds.y + 50 + (index * 30));
       monitorManager.assignWindowToMonitor(window.id, monitorId);
@@ -130,7 +131,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
 
   // Get windows assigned to a monitor
   const getWindowsForMonitor = (monitorId: string) => {
-    return openWindows.filter(win => {
+    return openWindows.filter((win: { id: string; component: string }) => {
       const assigned = monitorManager.getMonitorForWindow(win.id, false);
       return assigned && assigned.id === monitorId;
     });
@@ -163,6 +164,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white">Multi-Monitor Layout</h2>
           <button
+            type="button"
             onClick={onClose}
             className="text-white/70 hover:text-white transition-colors focus:outline-none focus:ring focus:ring-blue-400"
             aria-label="Close monitor layout"
@@ -253,7 +255,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
                   {/* Window thumbnails */}
                   {windows.length > 0 && (
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                      {windows.map(win => {
+                      {windows.map((win: { id: string; component: string; position: { x: number; y: number } }) => {
                         const app = appRegistry.get(win.component);
                         return (
                           <div key={win.id} className="flex items-center gap-2 bg-white/10 rounded px-2 py-1 text-xs text-white/80">
@@ -342,7 +344,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
                   <div className="bg-black/20 rounded-lg p-4">
                     <h4 className="text-white font-medium mb-3">Windows on this Monitor</h4>
                     <div className="grid grid-cols-3 gap-2">
-                      {getWindowsForMonitor(selectedMonitorInfo.id).map(win => {
+                      {getWindowsForMonitor(selectedMonitorInfo.id).map((win: { id: string; component: string; position: { x: number; y: number } }) => {
                         const app = appRegistry.get(win.component);
                         return (
                           <div key={win.id} className="flex items-center gap-2 bg-white/10 rounded px-2 py-1 text-xs text-white/80">
@@ -361,7 +363,7 @@ export const MultiMonitorLayout: React.FC<MonitorLayoutProps> = ({ isVisible, on
                     <button
                       type="button"
                       onClick={() => {
-                        openWindows.forEach((window) => {
+                        openWindows.forEach((window: { id: string; position: { x: number; y: number } }) => {
                           const windowElement = document.getElementById(`window-${window.id}`);
                           if (windowElement) {
                             windowElement.style.transform = `translate(${window.position.x}px, ${window.position.y}px)`;

@@ -1,16 +1,13 @@
 import { SearchProvider, SearchResult, SearchRegistry } from '../types/search.ts';
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 class _SearchRegistryImpl implements SearchRegistry {
-  private providers = new Map<string, SearchProvider>();
+  providers = new Map<string, SearchProvider>();
   private logger = new EnterpriseLogger();
 
-  // Replace logWarn calls with:
-  // this.logger.warn('message', { component: 'SearchRegistry', action: 'actionName' });
-  
   private cache = new Map<string, { timestamp: number; results: SearchResult[] }>();
   private cacheTTL = 10000; // 10 seconds
-  private quickAccessCache: SearchResult[] | null = null;
+  private quickAccessCache: { timestamp: number; results: SearchResult[] } | null = null;
   private quickAccessCacheTTL = 30000; // 30 seconds
 
   register(provider: SearchProvider): void {
@@ -39,7 +36,7 @@ class _SearchRegistryImpl implements SearchRegistry {
         this.cache.set(cacheKey, { timestamp: now, results });
         return results;
       } catch (error) {
-        logWarn(`Search provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.warn(`Search provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`, { component: 'SearchRegistry', action: 'search' });
         return [];
       }
     });
@@ -63,7 +60,7 @@ class _SearchRegistryImpl implements SearchRegistry {
         onResult(results);
         return results;
       } catch (error) {
-        logWarn(`Search provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.warn(`Search provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`, { component: 'SearchRegistry', action: 'searchStream' });
         return [];
       }
     });
@@ -73,32 +70,23 @@ class _SearchRegistryImpl implements SearchRegistry {
 
   async getQuickAccess(limit: number = 8): Promise<SearchResult[]> {
     const now = Date.now();
-    
-    // Check cache first
-    if (this.quickAccessCache && (now - (this.quickAccessCache as { timestamp: number }).timestamp < this.quickAccessCacheTTL)) {
-      return this.quickAccessCache.slice(0, limit);
+    if (this.quickAccessCache && (now - this.quickAccessCache.timestamp < this.quickAccessCacheTTL)) {
+      return this.quickAccessCache.results.slice(0, limit);
     }
-
-    // Collect quick access items from all providers
     const quickAccessPromises = Array.from(this.providers.values()).map(async (provider) => {
       if (provider.getQuickAccess) {
         try {
           return await provider.getQuickAccess(limit);
         } catch (error) {
-          logWarn(`Quick access from provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`);
+          this.logger.warn(`Quick access from provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`, { component: 'SearchRegistry', action: 'getQuickAccess' });
           return [];
         }
       }
       return [];
     });
-
     const allQuickAccess = await Promise.all(quickAccessPromises);
     const combined = this.sortResults(allQuickAccess.flat(), '');
-    
-    // Cache the results with timestamp
-    this.quickAccessCache = combined as SearchResult[] & { timestamp: number };
-    (this.quickAccessCache as SearchResult[] & { timestamp: number }).timestamp = now;
-    
+    this.quickAccessCache = { timestamp: now, results: combined };
     return combined.slice(0, limit);
   }
 
@@ -127,14 +115,11 @@ class _SearchRegistryImpl implements SearchRegistry {
   }
 }
 
-// Export singleton instance
-export const searchRegistry = new GlobalSearchRegistry();
+export const searchRegistry = new _SearchRegistryImpl();
 
-// Initialize enhanced search provider
 import { enhancedSearchProvider } from './enhancedSearchProvider.ts';
 searchRegistry.register(enhancedSearchProvider);
 
-// Utility function to create search results
 export const createSearchResult = (
   id: string,
   type: SearchResult['type'],
@@ -150,7 +135,6 @@ export const createSearchResult = (
   ...options,
 });
 
-// Utility function to create app search results
 export const createAppSearchResult = (
   appId: string,
   title: string,
@@ -166,11 +150,10 @@ export const createAppSearchResult = (
   description,
   category,
   action,
-  priority: 5, // Apps get high priority
+  priority: 5,
   metadata: { appId, category },
 });
 
-// Utility function to create command search results
 export const createCommandSearchResult = (
   id: string,
   title: string,
@@ -186,7 +169,6 @@ export const createCommandSearchResult = (
   metadata: { command, shortcut },
 });
 
-// Utility function to create system search results
 export const createSystemSearchResult = (
   id: string,
   title: string,
@@ -197,7 +179,7 @@ export const createSystemSearchResult = (
   id: `system-${id}`,
   type: 'system',
   title,
-  icon,
+  icon: icon ?? '',
   action,
   priority: 3,
   metadata: { systemAction },

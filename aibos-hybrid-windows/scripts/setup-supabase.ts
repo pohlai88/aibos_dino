@@ -121,7 +121,7 @@ class SupabaseSetup {
         return;
       }
 
-      const { data: listData, error: listError } = await supabase
+      const { data: _listData, error: listError } = await supabase
         .rpc('get_file_system_tree', { p_path: '' });
 
       if (listError) {
@@ -136,7 +136,7 @@ class SupabaseSetup {
 
       logSuccess('Operations test passed');
       this.report.actionsPerformed.push('Performed basic Supabase RPC tests');
-    } catch (error) {
+    } catch (_error) {
       this.report.warnings.push('Operations test failed. This may be expected if schema is missing.');
       logWarn('Operations test failed. Possibly schema missing.');
     }
@@ -254,7 +254,7 @@ async function main() {
   const config: SetupConfig = {
     supabaseUrl,
     supabaseAnonKey,
-    supabaseServiceKey: supabaseServiceKey || undefined,
+    ...(supabaseServiceKey ? { supabaseServiceKey } : {}),
   };
 
   const setup = new SupabaseSetup(config);

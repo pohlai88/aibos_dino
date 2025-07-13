@@ -1,6 +1,8 @@
 #!/usr/bin/env -S deno run --allow-all
 
 import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
+import { queryOptimizer } from '../src/services/query-optimizer.ts';
+import { supabase } from '../modules/supabase-client.ts';
 
 interface QueryMetrics {
   table: string;
@@ -10,7 +12,7 @@ interface QueryMetrics {
   timestamp: Date;
 }
 
-interface CacheEntry<T = any> {
+interface CacheEntry<T = unknown> {
   data: T;
   timestamp: number;
   ttl: number;
@@ -195,14 +197,14 @@ class SupabasePerformanceOptimizer {
     const results = {
       timestamp: new Date().toISOString(),
       benchmarks: {} as Record<string, number>,
-      cacheStats: {} as Record<string, any>,
+      cacheStats: {} as Record<string, unknown>,
       recommendations: [] as string[]
     };
     
     // Benchmark tenant queries
     const tenantStart = performance.now();
     await supabase.rpc('get_tenants_paginated', { p_page: 0, p_limit: 20 });
-    results.benchmarks.tenants_rpc = performance.now() - tenantStart;
+    results.benchmarks['tenants_rpc'] = performance.now() - tenantStart;
     
     // Benchmark notes queries
     const notesStart = performance.now();
@@ -211,23 +213,23 @@ class SupabasePerformanceOptimizer {
       .select('id, title, created_at')
       .eq('is_deleted', false)
       .limit(50);
-    results.benchmarks.notes_query = performance.now() - notesStart;
+    results.benchmarks['notes_query'] = performance.now() - notesStart;
     
     // Benchmark metrics RPC
     const metricsStart = performance.now();
     await supabase.rpc('get_tenant_metrics_optimized', { 
       p_tenant_id: '550e8400-e29b-41d4-a716-446655440000' 
     });
-    results.benchmarks.metrics_rpc = performance.now() - metricsStart;
+    results.benchmarks['metrics_rpc'] = performance.now() - metricsStart;
     
     // Generate recommendations
-    if (results.benchmarks.tenants_rpc > 100) {
+    if (results.benchmarks['tenants_rpc'] > 100) {
       results.recommendations.push('Consider adding more specific indexes for tenant queries');
     }
-    if (results.benchmarks.notes_query > 80) {
+    if (results.benchmarks['notes_query'] > 80) {
       results.recommendations.push('Notes query exceeds target - review pagination strategy');
     }
-    if (results.benchmarks.metrics_rpc > 100) {
+    if (results.benchmarks['metrics_rpc'] > 100) {
       results.recommendations.push('Metrics RPC needs further optimization');
     }
     
@@ -238,6 +240,28 @@ class SupabasePerformanceOptimizer {
     );
     
     logSuccess(`✅ Benchmark complete - Average query time: ${Object.values(results.benchmarks).reduce((a, b) => a + b, 0) / Object.keys(results.benchmarks).length}ms`);
+  }
+
+  // --- Added missing methods as wrappers for getPerformanceReport() ---
+  analyzeCachePerformance(): void {
+    // Placeholder: In a real implementation, analyze cache stats
+    logInfo('[Cache] Cache performance analysis not implemented.');
+  }
+
+  getAverageQueryTime(): number {
+    return this.getPerformanceReport().averageDuration;
+  }
+
+  getCacheHitRate(): number {
+    return this.getPerformanceReport().cacheHitRate;
+  }
+
+  getSlowestQueries(): QueryMetrics[] {
+    return this.getPerformanceReport().slowestQueries;
+  }
+
+  getRecommendations(): string[] {
+    return this.getPerformanceReport().recommendations;
   }
 }
 

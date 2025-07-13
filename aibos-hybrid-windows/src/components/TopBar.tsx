@@ -5,13 +5,25 @@ import { useUIState } from '../store/uiState.ts';
 import { Tooltip } from './Tooltip.tsx';
 import { getColor, getGradient, applyThemeWithCSS } from '../utils/themeHelpers.ts';
 import { animation } from '../utils/designTokens.ts';
-import { NotificationCenter } from './NotificationCenter.tsx';
+import { NotificationCenter as _NotificationCenter } from './NotificationCenter.tsx';
 // Replace the legacy import
 // import { notificationManager } from '../services/notificationManager.ts';
 
 // Add this import instead
 import { notificationService } from '../services/notification-service.ts';
 import { SystemTray } from './SystemTray.tsx';
+
+const LOGO_TEXT = 'AI-BOS';
+const TOPBAR_HEIGHT = 'h-16';
+const TOPBAR_Z_INDEX = 'z-50';
+
+interface SystemStatus {
+  cpu: number;
+  memory: number;
+  network: 'online' | 'slow' | 'offline';
+  battery: number;
+  notifications: number;
+}
 
 const Logo: React.FC = memo(() => {
   const { navigateHome } = useUIState();
@@ -170,7 +182,7 @@ const NotificationButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) =
   useEffect(() => {
     const updateCount = () => {
       const notifications = notificationService.getHistory({ limit: 100 });
-      const unreadCount = notifications.filter(n => !n.metadata?.isRead).length;
+      const unreadCount = notifications.filter(n => !n.metadata?.['isRead']).length;
       setUnreadCount(unreadCount);
     };
     
@@ -270,7 +282,7 @@ const ThemeToggle: React.FC = memo(() => {
 });
 
 const SystemStatusIndicator: React.FC = memo(() => {
-  const { colorMode } = useUIState();
+  const { colorMode: _colorMode } = useUIState();
   const [status, setStatus] = useState<SystemStatus>({
     cpu: 45,
     memory: 62,
@@ -315,7 +327,7 @@ const SystemStatusIndicator: React.FC = memo(() => {
   // Simulate system status updates with performance optimization
   useEffect(() => {
     const interval = setInterval(() => {
-      setStatus(prev => ({
+      setStatus((prev: SystemStatus) => ({
         ...prev,
         cpu: Math.floor(Math.random() * 30) + 30,
         memory: Math.floor(Math.random() * 20) + 50,
@@ -364,7 +376,7 @@ const SystemStatusIndicator: React.FC = memo(() => {
 });
 
 const NotificationIndicator: React.FC = memo(() => {
-  const { colorMode } = useUIState();
+  const { colorMode: _colorMode } = useUIState();
   const [notifications, setNotifications] = useState(3);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -376,12 +388,12 @@ const NotificationIndicator: React.FC = memo(() => {
 
   // Performance: Memoized theme-aware styles
   const buttonStyles = useMemo(() => ({
-    background: getGradient('professional.slate', colorMode),
+    background: getGradient('professional.slate', _colorMode),
     backdropFilter: `blur(8px)`,
-    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    border: `1px solid ${getColor('glass.light.30', _colorMode)}`,
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
     transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
-  }), [colorMode, prefersReducedMotion]);
+  }), [_colorMode, prefersReducedMotion]);
 
   const handleToggle = useCallback(() => {
     setIsOpen(!isOpen);
@@ -457,6 +469,15 @@ const SearchButton: React.FC = memo(() => {
   );
 });
 
+// Add UserAvatar component
+const UserAvatar: React.FC = memo(() => {
+  return (
+    <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-white text-sm">
+      👤
+    </div>
+  );
+});
+
 interface TopBarProps {
   className?: string;
   deviceInfo?: import('../utils/responsive.ts').DeviceInfo;
@@ -466,7 +487,7 @@ interface TopBarProps {
 }
 
 const TopBar: React.FC<TopBarProps> = ({ className = '', onOpenWindowGroups, onOpenGridLayout, onOpenNotifications }) => {
-  const { theme, setTheme, colorMode } = useUIState();
+  const { theme: _theme, setTheme: _setTheme, colorMode } = useUIState();
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
@@ -549,31 +570,3 @@ ThemeToggle.displayName = 'ThemeToggle';
 SystemStatusIndicator.displayName = 'SystemStatusIndicator';
 NotificationIndicator.displayName = 'NotificationIndicator';
 SearchButton.displayName = 'SearchButton';
-
-// Update the unread count logic
-useEffect(() => {
-  const updateCount = () => {
-    const unreadCount = notificationService.getUnreadCount();
-    setUnreadCount(unreadCount);
-  };
-  
-  updateCount();
-  
-  // Listen for notification events for real-time updates
-  const handleNotificationChange = () => updateCount();
-  notificationService.on('notification:delivered', handleNotificationChange);
-  notificationService.on('notification:dismissed', handleNotificationChange);
-  notificationService.on('notification:read', handleNotificationChange);
-  notificationService.on('notification:bulk-read', handleNotificationChange);
-  
-  // Fallback polling (reduced frequency)
-  const interval = setInterval(updateCount, 5000); // Every 5 seconds instead of 1
-  
-  return () => {
-    clearInterval(interval);
-    notificationService.off('notification:delivered', handleNotificationChange);
-    notificationService.off('notification:dismissed', handleNotificationChange);
-    notificationService.off('notification:read', handleNotificationChange);
-    notificationService.off('notification:bulk-read', handleNotificationChange);
-  };
-}, []);

@@ -1,7 +1,6 @@
 #!/usr/bin/env -S deno run --allow-read --allow-run
 
 import { walk } from 'https://deno.land/std@0.208.0/fs/walk.ts';
-import { join } from 'https://deno.land/std@0.208.0/path/mod.ts';
 import { writeJsonFile } from '../modules/filesystem.ts';
 import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
 
@@ -48,7 +47,7 @@ class PerformanceOptimizer {
     });
 
     const { code, stdout, stderr } = await process.output();
-    const output = new TextDecoder().decode(stdout);
+    const _output = new TextDecoder().decode(stdout);
     const errors = new TextDecoder().decode(stderr);
 
     if (code === 0) {
@@ -136,7 +135,7 @@ class PerformanceOptimizer {
     });
 
     // Simulated memory usage check (browser-specific; skip in Deno runtime)
-    const memoryInfo = (performance as any).memory;
+    const memoryInfo = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
     if (memoryInfo) {
       this.record({
         file: 'Memory Usage',
