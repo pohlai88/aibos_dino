@@ -6,7 +6,7 @@
 import { SearchProvider, SearchResult } from '../types/search.ts';
 import { fileIndexer, FileMetadata, SearchFilters } from './fileIndexer.ts';
 import { createSearchResult } from './searchRegistry.ts';
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 export interface EnhancedSearchOptions {
   includeFiles?: boolean;
@@ -432,12 +432,12 @@ class EnhancedSearchProvider implements SearchProvider {
   private async openFile(file: FileMetadata): Promise<void> {
     try {
       // In a real implementation, this would open the file with the appropriate app
-      logInfo(`Opening file: ${file.path}`);
+      this.logger.info(`Opening file: ${file.path}`, { component: 'EnhancedSearchProvider', action: 'openFile', metadata: { path: file.path } });
       
       // For now, just log the action
       console.log(`Would open file: ${file.path}`);
     } catch (error) {
-      logWarn(`Failed to open file ${file.path}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`Failed to open file ${file.path}: ${error instanceof Error ? error.message : String(error)}`, { component: 'EnhancedSearchProvider', action: 'openFile', metadata: { path: file.path } });
     }
   }
 

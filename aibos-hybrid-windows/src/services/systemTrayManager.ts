@@ -49,7 +49,7 @@ class SystemTrayManager {
       this.trayItems.delete(windowId);
       this.notifyListeners();
       // Trigger window restore event
-      window.dispatchEvent(new CustomEvent('restore-window', { detail: { windowId } }));
+      globalThis.dispatchEvent(new CustomEvent('restore-window', { detail: { windowId } }));
     }
   }
 
@@ -110,12 +110,12 @@ class SystemTrayManager {
 
   // Show desktop
   showDesktop(): void {
-    window.dispatchEvent(new CustomEvent('show-desktop'));
+    globalThis.dispatchEvent(new CustomEvent('show-desktop'));
   }
 
   // Open task manager
   openTaskManager(): void {
-    window.dispatchEvent(new CustomEvent('open-task-manager'));
+    globalThis.dispatchEvent(new CustomEvent('open-task-manager'));
   }
 
   // Subscribe to tray changes

@@ -93,7 +93,7 @@ const useClock = (timezone: Timezone) => {
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -186,10 +186,14 @@ const useWeather = (timezone: Timezone) => {
   const [weather, setWeather] = useState<Weather | null>(null);
 
   useEffect(() => {
-    const fetchWeather = async () => {
+    const fetchWeather = () => {
       try {
         // TODO: Replace with actual weather API
         const randomCondition = WEATHER_CONDITIONS[Math.floor(Math.random() * WEATHER_CONDITIONS.length)];
+        if (!randomCondition) {
+          console.warn('No weather condition found');
+          return;
+        }
         const mockWeather: Weather = {
           temperature: Math.floor(Math.random() * 30) + 10,
           condition: randomCondition.condition,
@@ -234,7 +238,10 @@ const ModeSelector: React.FC<{
       const currentIndex = modes.indexOf(currentMode);
       const direction = e.key === 'ArrowLeft' ? -1 : 1;
       const newIndex = (currentIndex + direction + modes.length) % modes.length;
-      onModeChange(modes[newIndex]);
+      const newMode = modes[newIndex];
+      if (newMode) {
+        onModeChange(newMode);
+      }
     }
   }, [onModeChange]);
 
@@ -242,6 +249,7 @@ const ModeSelector: React.FC<{
     <div className="flex space-x-1 mb-3" role="tablist" aria-label="Clock modes">
       {(['clock', 'stopwatch', 'timer'] as const).map((m) => (
         <button
+          type="button"
           key={m}
           role="tab"
           aria-selected={mode === m}
@@ -297,6 +305,7 @@ const TimezoneSelector: React.FC<{
   return (
     <div className="relative mb-2">
       <button
+        type="button"
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="text-xs text-white text-opacity-80 hover:text-opacity-100 transition-colors"
@@ -315,6 +324,7 @@ const TimezoneSelector: React.FC<{
         >
           {TIMEZONES.map((tz) => (
             <button
+              type="button"
               key={tz.name}
               role="option"
               aria-selected={timezone.name === tz.name}
@@ -556,6 +566,7 @@ const StopwatchMode: React.FC<{
       {/* Stopwatch Controls */}
       <div className="flex space-x-2 mb-2">
         <button
+          type="button"
           onClick={stopwatch.running ? stopwatch.pause : stopwatch.start}
           style={buttonStyles}
           className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
@@ -564,6 +575,7 @@ const StopwatchMode: React.FC<{
           {stopwatch.running ? 'Pause' : 'Start'}
         </button>
         <button
+          type="button"
           onClick={stopwatch.reset}
           style={buttonStyles}
           className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
@@ -572,6 +584,7 @@ const StopwatchMode: React.FC<{
           Reset
         </button>
         <button
+          type="button"
           onClick={stopwatch.lap}
           style={buttonStyles}
           className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
@@ -635,6 +648,7 @@ const TimerMode: React.FC<{
       {/* Timer Controls */}
       <div className="flex space-x-2 mb-2">
         <button
+          type="button"
           onClick={timer.running ? timer.pause : timer.start}
           disabled={timer.time === 0}
           style={timer.time === 0 ? buttonStyles.disabled : buttonStyles.active}
@@ -646,6 +660,7 @@ const TimerMode: React.FC<{
           {timer.running ? 'Pause' : 'Start'}
         </button>
         <button
+          type="button"
           onClick={timer.reset}
           style={buttonStyles.active}
           className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
@@ -678,7 +693,7 @@ const TimerMode: React.FC<{
 export const Clock: React.FC = () => {
   const { colorMode } = useUIState();
   const [mode, setMode] = useState<ClockMode>('clock');
-  const [selectedTimezone, setSelectedTimezone] = useState<Timezone>(TIMEZONES[0]);
+  const [selectedTimezone, setSelectedTimezone] = useState<Timezone>(TIMEZONES[0] || { name: 'local', offset: 0, label: 'Local' });
 
   const time = useClock(selectedTimezone);
   const stopwatch = useStopwatch();
@@ -687,7 +702,7 @@ export const Clock: React.FC = () => {
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 

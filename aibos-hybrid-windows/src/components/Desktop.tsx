@@ -1,13 +1,10 @@
 /** @jsxImportSource react */
-import React, { useState, useEffect, useCallback, useMemo, memo, Suspense, lazy } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, memo, Suspense, lazy } from 'react';
 import { getColor, getGradient, applyThemeWithCSS } from '../utils/themeHelpers.ts';
-import { blur, elevation, animation } from '../utils/designTokens.ts';
 import { useUIState } from '../store/uiState.ts';
 import { useResponsiveConfig } from '../utils/responsive.ts';
 import { appRegistry } from '../services/appRegistry.ts';
 import { searchRegistry } from '../services/searchRegistry.ts';
-import { systemCommands } from '../services/systemCommands.ts';
 import { shortcutManager } from '../services/shortcutManager.ts';
 import { monitorManager } from '../services/monitorManager.ts';
 import { Window } from './Window.tsx';
@@ -22,21 +19,13 @@ import { Calculator } from '../apps/Calculator.tsx';
 import iPod from '../apps/iPod.tsx';
 import { ThemeSelector } from './ThemeSelector.tsx';
 import { advancedCommandManager } from '../services/advancedCommands.ts';
-// Remove this unused import
-// import { notificationManager } from '../services/notificationManager.ts';
 import type { AppInfo } from '../services/appRegistry.ts';
-import { useMemoryCleanup, useEffectWithCleanup } from '../utils/memory-management.ts';
-import { usePerformanceTracking } from '../utils/performance-monitor.ts';
-import { ComponentWithId } from '../types/enhanced-types.ts';
 
 // Lazy load large components to reduce initial bundle size
-const TenantOnboarding = lazy(() => import('./TenantOnboarding.tsx'));
 const MultiMonitorLayout = lazy(() => import('./MultiMonitorLayout.tsx'));
-const WindowGroupManager = lazy(() => import('./WindowGroupManager.tsx'));
-const GridLayoutManager = lazy(() => import('./GridLayoutManager.tsx'));
-const NotificationCenter = lazy(() => import('./NotificationCenter.tsx'));
-const PropertiesDialog = lazy(() => import('./PropertiesDialog.tsx'));
-const AppStore = lazy(() => import('./AppStore.tsx'));
+const WindowGroupManager = lazy(() => import('./WindowGroupManager.tsx').then(m => ({ default: m.WindowGroupManager })));
+const GridLayoutManager = lazy(() => import('./GridLayoutManager.tsx').then(m => ({ default: m.GridLayoutManager })));
+const NotificationCenter = lazy(() => import('./NotificationCenter.tsx').then(m => ({ default: m.NotificationCenter })));
 
 // Loading fallback component
 const ComponentLoader: React.FC<{ name: string }> = ({ name }) => (
@@ -52,6 +41,13 @@ interface OpenWindow {
   component: string;
   props?: Record<string, unknown>;
   zIndex: number;
+  groupId?: string;
+}
+
+interface WindowGroup {
+  id: string;
+  name: string;
+  windowIds: string[];
 }
 
 // Initialize apps
@@ -134,7 +130,7 @@ const initializeApps = () => {
 // Initialize search providers
 const initializeSearchProviders = () => {
   searchRegistry.register(appRegistry.createSearchProvider());
-  searchRegistry.register(systemCommands.createSearchProvider());
+  // Note: systemCommands.createSearchProvider() removed as it doesn't exist
 };
 
 // Start button component
@@ -161,11 +157,11 @@ const StartButton: React.FC = memo(() => {
 
 // Windows container component
 const WindowsContainer: React.FC = memo(() => {
-  const { openWindows, closeWindow, windowGroups, activeGroupId } = useUIState();
+  const { openWindows, closeWindow, windowGroups } = useUIState();
 
   // Separate grouped and ungrouped windows
-  const groupedWindows = openWindows.filter((win: any) => win.groupId);
-  const ungroupedWindows = openWindows.filter((win: any) => !win.groupId);
+  const _groupedWindows = openWindows.filter((win: OpenWindow) => win.groupId);
+  const ungroupedWindows = openWindows.filter((win: OpenWindow) => !win.groupId);
 
   return (
     <div className="absolute inset-0">
@@ -182,7 +178,7 @@ const WindowsContainer: React.FC = memo(() => {
             id={win.id}
             title={appInfo.title}
             component={Comp}
-            props={win.props}
+            props={win.props || {}}
             zIndex={win.zIndex}
             onClose={() => closeWindow(win.id)}
           />
@@ -190,8 +186,8 @@ const WindowsContainer: React.FC = memo(() => {
       })}
 
       {/* Render grouped windows as tabbed windows */}
-      {Object.values(windowGroups).map((group: any) => {
-        const groupWindows = openWindows.filter((win: any) => group.windowIds.includes(win.id));
+      {Object.values(windowGroups as Record<string, WindowGroup>).map((group: WindowGroup) => {
+        const groupWindows = openWindows.filter((win: OpenWindow) => group.windowIds.includes(win.id));
         if (groupWindows.length === 0) return null;
 
         // For now, render the first window in the group as a placeholder
@@ -208,11 +204,11 @@ const WindowsContainer: React.FC = memo(() => {
             id={`group-${group.id}`}
             title={`${group.name} (${groupWindows.length})`}
             component={Comp}
-            props={firstWindow.props ?? {}}
+            props={firstWindow.props || {}}
             zIndex={firstWindow.zIndex}
             onClose={() => {
               // Close all windows in the group
-              groupWindows.forEach((win: any) => closeWindow(win.id));
+              groupWindows.forEach((win: OpenWindow) => closeWindow(win.id));
             }}
           />
         );
@@ -321,13 +317,12 @@ export const Desktop: React.FC = memo(() => {
   const [multiMonitorVisible, setMultiMonitorVisible] = useState(false);
   const [windowGroupManagerVisible, setWindowGroupManagerVisible] = useState(false);
   const [gridLayoutManagerVisible, setGridLayoutManagerVisible] = useState(false);
-  const [notificationCenterVisible, setNotificationCenterVisible] = useState(false);
   
   // Expose multi-monitor function globally for system commands
   useEffect(() => {
-    (window as any).openMultiMonitorLayout = () => setMultiMonitorVisible(true);
+    (globalThis as unknown as Record<string, unknown>)['openMultiMonitorLayout'] = () => setMultiMonitorVisible(true);
     return () => {
-      delete (window as any).openMultiMonitorLayout;
+      delete (globalThis as unknown as Record<string, unknown>)['openMultiMonitorLayout'];
     };
   }, []);
   
@@ -378,7 +373,8 @@ export const Desktop: React.FC = memo(() => {
           <div className="text-xl font-semibold mb-2">Initialization Error</div>
           <div className="text-sm opacity-75 mb-4">{error}</div>
           <button
-            onClick={() => window.location.reload()}
+            type="button"
+            onClick={() => globalThis.location.reload()}
             className="px-4 py-2 bg-white bg-opacity-20 rounded hover:bg-opacity-30 transition-colors"
           >
             Retry
@@ -396,7 +392,7 @@ export const Desktop: React.FC = memo(() => {
       <TopBar 
         onOpenWindowGroups={() => setWindowGroupManagerVisible(true)}
         onOpenGridLayout={() => setGridLayoutManagerVisible(true)}
-        onOpenNotifications={() => setNotificationCenterVisible(true)}
+        onOpenNotifications={() => {}}
       />
       <WindowsContainer />
       <Dock />
@@ -424,10 +420,7 @@ export const Desktop: React.FC = memo(() => {
       </Suspense>
       
       <Suspense fallback={<ComponentLoader name="Notification Center" />}>
-        <NotificationCenter 
-          isVisible={notificationCenterVisible} 
-          onClose={() => setNotificationCenterVisible(false)} 
-        />
+        <NotificationCenter />
       </Suspense>
     </div>
   );
@@ -440,51 +433,3 @@ Desktop.displayName = 'Desktop';
 StartButton.displayName = 'StartButton';
 WindowsContainer.displayName = 'WindowsContainer';
 BackgroundSystem.displayName = 'BackgroundSystem';
-
-
-export function Desktop({ id, className, ...props }: DesktopProps) {
-  const { addCleanup } = useMemoryCleanup();
-  const { recordError } = usePerformanceTracking('Desktop');
-  
-  // Enhanced effect with automatic cleanup
-  useEffectWithCleanup(() => {
-    const handleResize = () => {
-      try {
-        // Resize logic
-      } catch (error) {
-        recordError(`Resize error: ${error.message}`);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
-  // Enhanced effect with automatic cleanup
-  useEffectWithCleanup(() => {
-    const handleResize = () => {
-      try {
-        // Resize logic
-      } catch (error) {
-        recordError(`Resize error: ${error.message}`);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
-  // Enhanced effect with automatic cleanup
-  useEffectWithCleanup(() => {
-    const handleResize = () => {
-      try {
-        // Resize logic
-      } catch (error) {
-        recordError(`Resize error: ${error.message}`);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-}

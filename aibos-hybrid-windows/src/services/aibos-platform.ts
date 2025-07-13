@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
 
 import { supabase } from '../../modules/supabase-client.ts';
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 import { ApiResponse } from '../../modules/types.ts';
 import { queryOptimizer } from './query-optimizer.ts';
 import { SearchProvider, SearchResult } from '../types/search.ts';
@@ -151,6 +151,7 @@ export interface NotificationPayload {
 
 // AIBOS Platform Service Class
 export class AIBOSPlatformService {
+  private logger = new EnterpriseLogger();
   // Helper method to create consistent API responses
   private createApiResponse<T>(success: boolean, data?: T, error?: string): ApiResponse<T> {
     return {
@@ -169,7 +170,7 @@ export class AIBOSPlatformService {
   async getCurrentUser() {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) {
-      logError(`Failed to get current user: ${error.message}`);
+      this.logger.error(`Failed to get current user: ${error.message}`, { component: 'AibosPlatform', action: 'getCurrentUser' });
       throw error;
     }
     return user;
@@ -182,7 +183,7 @@ export class AIBOSPlatformService {
         .rpc('create_tenant', { p_name: name, p_slug: slug, p_description: description });
 
       if (error) {
-        logError(`Tenant creation failed: ${error.message}`);
+        this.logger.error(`Tenant creation failed: ${error.message}`, { component: 'AibosPlatform', action: 'createTenant' });
         return {
           success: false,
           error: error.message,
@@ -190,14 +191,14 @@ export class AIBOSPlatformService {
         };
       }
 
-      logSuccess(`Tenant created successfully: ${name}`);
+      this.logger.info(`Tenant created successfully: ${name}`, { component: 'AibosPlatform', action: 'createTenant' });
       return {
         success: true,
         data: data,
         timestamp: new Date()
       };
     } catch (error) {
-      logError(`Unexpected error in createTenant: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in createTenant: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'createTenant' });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -219,13 +220,13 @@ export class AIBOSPlatformService {
         .range(from, to);
 
       if (error) {
-        logError(`Failed to fetch tenants: ${error.message}`);
+        this.logger.error(`Failed to fetch tenants: ${error.message}`, { component: 'AibosPlatform', action: 'getUserTenants' });
         return this.createApiResponse<Tenant[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<Tenant[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getUserTenants: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getUserTenants: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getUserTenants' });
       return this.createApiResponse<Tenant[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -240,13 +241,13 @@ export class AIBOSPlatformService {
         .single();
 
       if (error) {
-        logError(`Tenant not found: ${error.message}`);
+        this.logger.error(`Tenant not found: ${error.message}`, { component: 'AibosPlatform', action: 'getTenant' });
         return this.createApiResponse<Tenant>(false, undefined, error.message);
       }
 
       return this.createApiResponse<Tenant>(true, data);
     } catch (error) {
-      logError(`Unexpected error in getTenant: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getTenant: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getTenant' });
       return this.createApiResponse<Tenant>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -264,13 +265,13 @@ export class AIBOSPlatformService {
         .order('joined_at', { ascending: false });
 
       if (error) {
-        logError(`Failed to fetch tenant members: ${error.message}`);
+        this.logger.error(`Failed to fetch tenant members: ${error.message}`, { component: 'AibosPlatform', action: 'getTenantMembers' });
         return this.createApiResponse<TenantMember[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<TenantMember[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getTenantMembers: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getTenantMembers: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getTenantMembers' });
       return this.createApiResponse<TenantMember[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -282,7 +283,7 @@ export class AIBOSPlatformService {
       const { data: userData, error: userError } = await supabase.auth.admin.inviteUserByEmail(email);
       
       if (userError) {
-        logError(`User invitation failed: ${userError.message}`);
+        this.logger.error(`User invitation failed: ${userError.message}`, { component: 'AibosPlatform', action: 'inviteUserToTenant' });
         return this.createApiResponse(false, undefined, userError.message);
       }
 
@@ -297,14 +298,14 @@ export class AIBOSPlatformService {
         });
 
       if (error) {
-        logError(`Failed to add user to tenant: ${error.message}`);
+        this.logger.error(`Failed to add user to tenant: ${error.message}`, { component: 'AibosPlatform', action: 'inviteUserToTenant' });
         return this.createApiResponse(false, undefined, error.message);
       }
 
-      logSuccess(`User ${email} invited to tenant successfully`);
+      this.logger.info(`User ${email} invited to tenant successfully`, { component: 'AibosPlatform', action: 'inviteUserToTenant' });
       return this.createApiResponse(true, { user_id: userData.user?.id });
     } catch (error) {
-      logError(`Unexpected error in inviteUserToTenant: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in inviteUserToTenant: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'inviteUserToTenant' });
       return this.createApiResponse(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -333,13 +334,13 @@ export class AIBOSPlatformService {
       const { data, error } = await query;
 
       if (error) {
-        logError(`Failed to fetch apps: ${error.message}`);
+        this.logger.error(`Failed to fetch apps: ${error.message}`, { component: 'AibosPlatform', action: 'getPublishedApps' });
         return this.createApiResponse<App[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<App[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getPublishedApps: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getPublishedApps: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getPublishedApps' });
       return this.createApiResponse<App[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -354,13 +355,13 @@ export class AIBOSPlatformService {
         .order('sort_order', { ascending: true });
 
       if (error) {
-        logError(`Failed to fetch app categories: ${error.message}`);
+        this.logger.error(`Failed to fetch app categories: ${error.message}`, { component: 'AibosPlatform', action: 'getAppCategories' });
         return this.createApiResponse<AppCategory[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<AppCategory[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getAppCategories: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getAppCategories: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getAppCategories' });
       return this.createApiResponse<AppCategory[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -380,13 +381,13 @@ export class AIBOSPlatformService {
         .single();
 
       if (error) {
-        logError(`App not found: ${error.message}`);
+        this.logger.error(`App not found: ${error.message}`, { component: 'AibosPlatform', action: 'getAppBySlug' });
         return this.createApiResponse<App>(false, undefined, error.message);
       }
 
       return this.createApiResponse<App>(true, data);
     } catch (error) {
-      logError(`Unexpected error in getAppBySlug: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getAppBySlug: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getAppBySlug' });
       return this.createApiResponse<App>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -402,14 +403,14 @@ export class AIBOSPlatformService {
         .rpc('install_app', { p_app_id: appId, p_tenant_id: tenantId });
 
       if (error) {
-        logError(`App installation failed: ${error.message}`);
+        this.logger.error(`App installation failed: ${error.message}`, { component: 'AibosPlatform', action: 'installApp' });
         return this.createApiResponse<AppInstallation>(false, undefined, error.message);
       }
 
-      logSuccess(`App installed successfully for tenant ${tenantId}`);
+      this.logger.info(`App installed successfully for tenant ${tenantId}`, { component: 'AibosPlatform', action: 'installApp' });
       return this.createApiResponse<AppInstallation>(true, data);
     } catch (error) {
-      logError(`Unexpected error in installApp: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in installApp: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'installApp' });
       return this.createApiResponse<AppInstallation>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -421,13 +422,13 @@ export class AIBOSPlatformService {
         .rpc('get_tenant_apps', { p_tenant_id: tenantId });
 
       if (error) {
-        logError(`Failed to fetch tenant apps: ${error.message}`);
+        this.logger.error(`Failed to fetch tenant apps: ${error.message}`, { component: 'AibosPlatform', action: 'getTenantApps' });
         return this.createApiResponse<TenantApp[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<TenantApp[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getTenantApps: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getTenantApps: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getTenantApps' });
       return this.createApiResponse<TenantApp[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -441,14 +442,14 @@ export class AIBOSPlatformService {
         .eq('id', installationId);
 
       if (error) {
-        logError(`App uninstallation failed: ${error.message}`);
+        this.logger.error(`App uninstallation failed: ${error.message}`, { component: 'AibosPlatform', action: 'uninstallApp' });
         return this.createApiResponse(false, undefined, error.message);
       }
 
-      logSuccess(`App uninstalled successfully`);
+      this.logger.info(`App uninstalled successfully`, { component: 'AibosPlatform', action: 'uninstallApp' });
       return this.createApiResponse(true);
     } catch (error) {
-      logError(`Unexpected error in uninstallApp: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in uninstallApp: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'uninstallApp' });
       return this.createApiResponse(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -479,14 +480,14 @@ export class AIBOSPlatformService {
         .single();
 
       if (error) {
-        logError(`Integration creation failed: ${error.message}`);
+        this.logger.error(`Integration creation failed: ${error.message}`, { component: 'AibosPlatform', action: 'createAppIntegration' });
         return this.createApiResponse<AppIntegration>(false, undefined, error.message);
       }
 
-      logSuccess(`App integration created successfully`);
+      this.logger.info(`App integration created successfully`, { component: 'AibosPlatform', action: 'createAppIntegration' });
       return this.createApiResponse<AppIntegration>(true, data);
     } catch (error) {
-      logError(`Unexpected error in createAppIntegration: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in createAppIntegration: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'createAppIntegration' });
       return this.createApiResponse<AppIntegration>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -506,13 +507,13 @@ export class AIBOSPlatformService {
       const { data, error } = await query;
 
       if (error) {
-        logError(`Failed to fetch app integrations: ${error.message}`);
+        this.logger.error(`Failed to fetch app integrations: ${error.message}`, { component: 'AibosPlatform', action: 'getAppIntegrations' });
         return this.createApiResponse<AppIntegration[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<AppIntegration[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getAppIntegrations: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getAppIntegrations: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getAppIntegrations' });
       return this.createApiResponse<AppIntegration[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -531,14 +532,14 @@ export class AIBOSPlatformService {
         .single();
 
       if (error) {
-        logError(`Integration update failed: ${error.message}`);
+        this.logger.error(`Integration update failed: ${error.message}`, { component: 'AibosPlatform', action: 'updateAppIntegration' });
         return this.createApiResponse<AppIntegration>(false, undefined, error.message);
       }
 
-      logSuccess(`App integration updated successfully`);
+      this.logger.info(`App integration updated successfully`, { component: 'AibosPlatform', action: 'updateAppIntegration' });
       return this.createApiResponse<AppIntegration>(true, data);
     } catch (error) {
-      logError(`Unexpected error in updateAppIntegration: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in updateAppIntegration: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'updateAppIntegration' });
       return this.createApiResponse<AppIntegration>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -573,13 +574,13 @@ export class AIBOSPlatformService {
         .single();
 
       if (error) {
-        logError(`Notification creation failed: ${error.message}`);
+        this.logger.error(`Notification creation failed: ${error.message}`, { component: 'AibosPlatform', action: 'createNotification' });
         return this.createApiResponse<Notification>(false, undefined, error.message);
       }
 
       return this.createApiResponse<Notification>(true, notification);
     } catch (error) {
-      logError(`Unexpected error in createNotification: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in createNotification: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'createNotification' });
       return this.createApiResponse<Notification>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -595,13 +596,13 @@ export class AIBOSPlatformService {
         .limit(limit);
 
       if (error) {
-        logError(`Failed to fetch notifications: ${error.message}`);
+        this.logger.error(`Failed to fetch notifications: ${error.message}`, { component: 'AibosPlatform', action: 'getUserNotifications' });
         return this.createApiResponse<Notification[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<Notification[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getUserNotifications: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getUserNotifications: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getUserNotifications' });
       return this.createApiResponse<Notification[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -615,13 +616,13 @@ export class AIBOSPlatformService {
         .eq('id', notificationId);
 
       if (error) {
-        logError(`Failed to mark notification as read: ${error.message}`);
+        this.logger.error(`Failed to mark notification as read: ${error.message}`, { component: 'AibosPlatform', action: 'markNotificationAsRead' });
         return this.createApiResponse(false, undefined, error.message);
       }
 
       return this.createApiResponse(true);
     } catch (error) {
-      logError(`Unexpected error in markNotificationAsRead: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in markNotificationAsRead: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'markNotificationAsRead' });
       return this.createApiResponse(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -703,7 +704,7 @@ export class AIBOSPlatformService {
       // Check specific permission
       return data.permissions?.[permission] === true;
     } catch (error) {
-      logWarn(`Permission check failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`Permission check failed: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'hasTenantPermission' });
       return false;
     }
   }
@@ -722,7 +723,7 @@ export class AIBOSPlatformService {
 
       return data.role;
     } catch (error) {
-      logWarn(`Failed to get user tenant role: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`Failed to get user tenant role: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getUserTenantRole' });
       return null;
     }
   }
@@ -749,7 +750,7 @@ export class AIBOSPlatformService {
           new_values: newValues
         });
     } catch (error) {
-      logError(`Failed to log audit event: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Failed to log audit event: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'logAuditEvent' });
     }
   }
 }
@@ -768,7 +769,7 @@ export const lazyOperations = {
 
 // Usage example in AIBOSPlatformService:
 class AIBOSPlatformService {
-  // ... existing methods ...
+  private logger = new EnterpriseLogger();
   
   // Optimized tenant retrieval with caching
   async getUserTenants(page: number = 0, limit: number = 20): Promise<ApiResponse<Tenant[]>> {
@@ -782,13 +783,13 @@ class AIBOSPlatformService {
         });
 
       if (error) {
-        logError(`Failed to fetch tenants: ${error.message}`);
+        this.logger.error(`Failed to fetch tenants: ${error.message}`, { component: 'AibosPlatform', action: 'getUserTenants' });
         return this.createApiResponse<Tenant[]>(false, undefined, error.message);
       }
 
       return this.createApiResponse<Tenant[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getUserTenants: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getUserTenants: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getUserTenants' });
       return this.createApiResponse<Tenant[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -814,7 +815,7 @@ class AIBOSPlatformService {
         .range(from, to);
 
       if (error) {
-        logError(`Failed to fetch notes: ${error.message}`);
+        this.logger.error(`Failed to fetch notes: ${error.message}`, { component: 'AibosPlatform', action: 'getNotes' });
         return this.createApiResponse<Note[]>(false, undefined, error.message);
       }
 
@@ -822,7 +823,7 @@ class AIBOSPlatformService {
       setCachedNotes(cacheKey, data || []);
       return this.createApiResponse<Note[]>(true, data || []);
     } catch (error) {
-      logError(`Unexpected error in getNotes: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getNotes: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getNotes' });
       return this.createApiResponse<Note[]>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -843,7 +844,7 @@ class AIBOSPlatformService {
         });
 
       if (error) {
-        logError(`Failed to fetch tenant metrics: ${error.message}`);
+        this.logger.error(`Failed to fetch tenant metrics: ${error.message}`, { component: 'AibosPlatform', action: 'getTenantMetrics' });
         return this.createApiResponse(false, undefined, error.message);
       }
 
@@ -851,7 +852,7 @@ class AIBOSPlatformService {
       setCachedNotes(cacheKey, data, 10000);
       return this.createApiResponse(true, data);
     } catch (error) {
-      logError(`Unexpected error in getTenantMetrics: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in getTenantMetrics: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'getTenantMetrics' });
       return this.createApiResponse(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -870,7 +871,7 @@ class AIBOSPlatformService {
         .single();
 
       if (error) {
-        logError(`Failed to create note: ${error.message}`);
+        this.logger.error(`Failed to create note: ${error.message}`, { component: 'AibosPlatform', action: 'createNote' });
         return this.createApiResponse<Note>(false, undefined, error.message);
       }
 
@@ -880,7 +881,7 @@ class AIBOSPlatformService {
 
       return this.createApiResponse<Note>(true, data);
     } catch (error) {
-      logError(`Unexpected error in createNote: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Unexpected error in createNote: ${error instanceof Error ? error.message : String(error)}`, { component: 'AibosPlatform', action: 'createNote' });
       return this.createApiResponse<Note>(false, undefined, error instanceof Error ? error.message : 'Unknown error');
     }
   }

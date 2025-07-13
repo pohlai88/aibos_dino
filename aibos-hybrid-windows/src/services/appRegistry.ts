@@ -1,10 +1,9 @@
 import React from 'react';
-// REMOVED: import { logInfo, logWarn, logError, logSuccess } from '../../modules/logging.ts';
 import { createAppSearchResult } from './searchRegistry.ts';
 import { useUIState } from '../store/uiState.ts';
 import { SearchProvider, SearchResult } from '../types/search.ts';
 import { monitorManager } from './monitorManager.ts';
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 // App categories for better organization
 export type AppCategory = 
@@ -97,6 +96,7 @@ export interface SearchProvider {
 
 // App registry service with enhanced functionality
 class AppRegistryService {
+  private logger = new EnterpriseLogger();
   private apps = new Map<string, AppInfo>();
   private categories = new Map<AppCategory, string>();
   private permissions = new Map<AppPermission, string>();
@@ -142,7 +142,7 @@ class AppRegistryService {
 
     // Check for duplicate IDs
     if (this.apps.has(app.id)) {
-      logWarn(`App with ID '${app.id}' already exists. Overwriting...`);
+      this.logger.warn(`App with ID '${app.id}' already exists. Overwriting...`, { component: 'AppRegistry', action: 'registerApp', metadata: { appId: app.id } });
     }
 
     // Set default values
@@ -181,7 +181,7 @@ class AppRegistryService {
 
     this.apps.set(app.id, appWithDefaults);
     this.emitEvent('appRegistered', appWithDefaults);
-    logSuccess(`App registered: ${app.title} (${app.id})`);
+    this.logger.info(`App registered: ${app.title} (${app.id})`, { component: 'AppRegistry', action: 'registerApp', metadata: { appId: app.id } });
   }
 
   // Unregister an app
@@ -190,7 +190,7 @@ class AppRegistryService {
     if (app) {
       this.apps.delete(id);
       this.emitEvent('appUnregistered', app);
-      logInfo(`App unregistered: ${app.title} (${id})`);
+      this.logger.info(`App unregistered: ${app.title} (${id})`, { component: 'AppRegistry', action: 'unregisterApp', metadata: { appId: id } });
       return true;
     }
     return false;
@@ -278,7 +278,7 @@ class AppRegistryService {
   launch(id: string, options?: AppLaunchOptions): boolean {
     const app = this.get(id);
     if (!app) {
-      logError(`App '${id}' not found`);
+      this.logger.error(`App '${id}' not found`, { component: 'AppRegistry', action: 'launchApp', metadata: { appId: id } });
       return false;
     }
 
@@ -314,10 +314,10 @@ class AppRegistryService {
       });
 
       this.emitEvent('appLaunched', app);
-      logSuccess(`App launched: ${app.title} (${id})`);
+      this.logger.info(`App launched: ${app.title} (${id})`, { component: 'AppRegistry', action: 'launchApp', metadata: { appId: id } });
       return true;
     } catch (error) {
-      logError(`Failed to launch app '${id}': ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Failed to launch app '${id}': ${error instanceof Error ? error.message : String(error)}`, { component: 'AppRegistry', action: 'launchApp', metadata: { appId: id } });
       app.status = 'error';
       this.emitEvent('appLaunchFailed', app);
       return false;
@@ -330,7 +330,7 @@ class AppRegistryService {
     if (app) {
       app.status = status;
       this.emitEvent('appStatusChanged', app);
-      logInfo(`App status updated: ${app.title} (${id}) -> ${status}`);
+      this.logger.info(`App status updated: ${app.title} (${id}) -> ${status}`, { component: 'AppRegistry', action: 'updateStatus', metadata: { appId: id, status } });
       return true;
     }
     return false;
@@ -342,7 +342,7 @@ class AppRegistryService {
     if (app) {
       app.metadata = { ...app.metadata, ...metadata };
       this.emitEvent('appMetadataUpdated', app);
-      logInfo(`App metadata updated: ${app.title} (${id})`);
+      this.logger.info(`App metadata updated: ${app.title} (${id})`, { component: 'AppRegistry', action: 'updateMetadata', metadata: { appId: id } });
       return true;
     }
     return false;
@@ -501,7 +501,7 @@ export const searchApps = (query: string, options?: Parameters<typeof appRegistr
   return appRegistry.search(query, options);
 };
 
-class AppRegistryProvider implements SearchProvider {
+class _AppRegistryProvider implements SearchProvider {
   private logger = new EnterpriseLogger();
   
   // Replace all logging calls:

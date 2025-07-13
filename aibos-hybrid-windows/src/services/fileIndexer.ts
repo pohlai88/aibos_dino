@@ -1,7 +1,7 @@
 // Consolidated FileIndexerService - Enterprise Implementation
-import { supabase } from '../../modules/supabase-client';
-import { EnterpriseLogger } from './core/logger';
-import { EventThrottler } from './core/event-throttler';
+import { supabase } from '../../modules/supabase-client.ts';
+import { EnterpriseLogger } from './core/logger.ts';
+import { EventThrottler } from './core/event-throttler.ts';
 
 // Unified interfaces
 export interface FileMetadata {
@@ -63,11 +63,11 @@ interface PersistentIndex {
 export class FileIndexerService implements PersistentIndex {
   private tenantId: string = 'default';
   private readonly LARGE_CONTENT_THRESHOLD = 1024 * 1024; // 1MB
-  private progressCallback?: (progress: IndexingProgress) => void;
+  private progressCallback?: ((progress: IndexingProgress) => void) | undefined;
   private startTime = 0;
   private fileChecksums = new Map<string, FileChecksum>();
   private isIndexing = false;
-  private indexingErrors: Array<{ file: string; error: any; type: string }> = [];
+  private indexingErrors: Array<{ file: string; error: unknown; type: string }> = [];
   private logger: EnterpriseLogger;
   private throttler: EventThrottler;
   private index = {
@@ -168,7 +168,7 @@ export class FileIndexerService implements PersistentIndex {
   async saveLargeContent(fileId: string, content: string): Promise<string> {
     const fileName = `content/${this.tenantId}/${fileId}.txt`;
     
-    const { data, error } = await supabase.storage
+    const { data: _data, error } = await supabase.storage
       .from('file-content')
       .upload(fileName, content, { upsert: true });
 
@@ -226,7 +226,7 @@ export class FileIndexerService implements PersistentIndex {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
+        if (!file) continue;
         this.reportProgress({
           phase: 'indexing',
           current: i + 1,
@@ -236,14 +236,12 @@ export class FileIndexerService implements PersistentIndex {
           estimatedTimeRemaining: this.calculateETA(i + 1, total),
           errors: this.indexingErrors.length
         });
-        
         try {
           await this.indexFileFromBlob(file);
         } catch (error) {
           this.addIndexingError(file.name, error, 'content');
         }
       }
-      
       await this.saveIndex();
     } finally {
       this.isIndexing = false;
@@ -377,7 +375,7 @@ export class FileIndexerService implements PersistentIndex {
   }
 
   private async createFileMetadata(file: File, name: string): Promise<FileMetadata> {
-    const content = this.isTextFile(name) ? await file.text() : undefined;
+    const content = this.isTextFile(name) ? await file.text() : '';
     const checksum = await this.calculateChecksum(file);
     
     return {
@@ -450,7 +448,7 @@ export class FileIndexerService implements PersistentIndex {
     return remaining / rate;
   }
 
-  private addIndexingError(file: string, error: any, type: string): void {
+  private addIndexingError(file: string, error: unknown, type: string): void {
     this.indexingErrors.push({ file, error, type });
     this.logger.error('Indexing error', {
       component: 'FileIndexer',
@@ -459,12 +457,12 @@ export class FileIndexerService implements PersistentIndex {
     });
   }
 
-  private async countFilesInDirectory(dirPath: string): Promise<number> {
+  private countFilesInDirectory(_dirPath: string): Promise<number> {
     // Implementation depends on file system access method
-    return 0; // Placeholder
+    return Promise.resolve(0); // Placeholder
   }
 
-  private async indexDirectoryWithProgress(dirPath: string, totalFiles: number): Promise<void> {
+  private async indexDirectoryWithProgress(_dirPath: string, _totalFiles: number): Promise<void> {
     // Implementation depends on file system access method
     // Placeholder for directory indexing logic
   }

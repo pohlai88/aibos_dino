@@ -13,7 +13,7 @@ import AppStore from '../components/AppStore.tsx';
 import TenantOnboarding from '../components/TenantOnboarding.tsx';
 import { ShortcutHelp } from '../components/ShortcutHelp.tsx';
 import { PerformanceDashboard } from '../components/PerformanceDashboard.tsx';
-import { Desktop } from '../components/Desktop.tsx';
+import { Desktop as _Desktop } from '../components/Desktop.tsx';
 
 // Component showcase interface
 interface ComponentStory {
@@ -21,11 +21,11 @@ interface ComponentStory {
   title: string;
   description: string;
   category: string;
-  component: React.ComponentType<any>;
-  props?: Record<string, any>;
+  component: React.ComponentType<Record<string, unknown>>;
+  props?: Record<string, unknown>;
   variants?: Array<{
     name: string;
-    props: Record<string, any>;
+    props: Record<string, unknown>;
   }>;
 }
 
@@ -125,7 +125,7 @@ const componentStories: ComponentStory[] = [
     component: Tooltip,
     props: {
       content: 'This is a tooltip',
-      children: <button>Hover me</button>
+      children: <button type="button">Hover me</button>
     },
   },
   {
@@ -206,6 +206,7 @@ const ComponentShowcase: React.FC = () => {
                 {categories.map(category => (
                   <button
                     key={category}
+                    type="button"
                     onClick={() => setSelectedCategory(category)}
                     className={`w-full text-left px-3 py-2 rounded transition-colors ${
                       selectedCategory === category
@@ -226,6 +227,7 @@ const ComponentShowcase: React.FC = () => {
                 {filteredStories.map(story => (
                   <button
                     key={story.id}
+                    type="button"
                     onClick={() => setSelectedComponent(story.id)}
                     className={`w-full text-left px-3 py-2 rounded transition-colors ${
                       selectedComponent === story.id
@@ -256,6 +258,7 @@ const ComponentShowcase: React.FC = () => {
                       <h4 className="text-sm font-semibold mb-2">Variants</h4>
                       <div className="flex flex-wrap gap-2">
                         <button
+                          type="button"
                           onClick={() => setSelectedVariant('default')}
                           className={`px-3 py-1 rounded text-sm transition-colors ${
                             selectedVariant === 'default'
@@ -268,6 +271,7 @@ const ComponentShowcase: React.FC = () => {
                         {selectedStory.variants.map(variant => (
                           <button
                             key={variant.name}
+                            type="button"
                             onClick={() => setSelectedVariant(variant.name)}
                             className={`px-3 py-1 rounded text-sm transition-colors ${
                               selectedVariant === variant.name

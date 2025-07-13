@@ -48,7 +48,7 @@ export function VirtualScrolling<T>({
     
     return (e: React.UIEvent<HTMLDivElement>) => {
       if (!ticking) {
-        window.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(() => {
           setScrollTop(e.currentTarget.scrollTop);
           ticking = false;
         });
@@ -58,13 +58,13 @@ export function VirtualScrolling<T>({
   }, []);
 
   // Scroll to item with bounds validation
-  const scrollToItem = useCallback((index: number, smooth = true) => {
+  const scrollToItem = useCallback((index: number, _smooth = true) => {
     if (index < 0 || index >= items.length) return;
     if (containerRef.current) {
       const targetScrollTop = index * itemHeight;
       containerRef.current.scrollTo({
         top: targetScrollTop,
-        behavior: smooth ? 'smooth' : 'auto'
+        behavior: _smooth ? 'smooth' : 'auto'
       });
     }
   }, [itemHeight, items.length]);
@@ -142,7 +142,7 @@ export function useVirtualScrolling<T>(
   const offsetY = visibleRange.start * itemHeight;
 
   // Scroll to item function for hook consumers
-  const scrollToItem = useCallback((index: number, smooth = true) => {
+  const scrollToItem = useCallback((index: number, _smooth = true) => {
     if (index < 0 || index >= items.length) return;
     const targetScrollTop = index * itemHeight;
     setScrollTop(targetScrollTop);

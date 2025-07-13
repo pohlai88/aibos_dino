@@ -1,3 +1,5 @@
+/// <reference lib="deno.ns" />
+
 /**
  * AI-BOS Configuration
  * 

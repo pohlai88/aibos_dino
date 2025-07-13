@@ -1,6 +1,5 @@
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 import { supabase } from '../../modules/supabase-client.ts';
-// REMOVED: import { logError, logInfo } from '../../modules/logging.ts';
 import { ApiResponse } from '../../modules/types.ts';
 
 class BulkOperationsService {
@@ -55,7 +54,7 @@ export async function bulkUpdateMembers(updates: any[]): Promise<ApiResponse<any
         .select();
         
       if (error) {
-        logError(`Failed to update member ${update.id}: ${error.message}`);
+        this.logger.error(`Failed to update member ${update.id}: ${error.message}`, { component: 'BulkOperations', action: 'updateMembers', metadata: { memberId: update.id } });
         continue;
       }
       
@@ -64,7 +63,7 @@ export async function bulkUpdateMembers(updates: any[]): Promise<ApiResponse<any
 
     return { success: true, data: results };
   } catch (error) {
-    logError(`Bulk update error: ${error instanceof Error ? error.message : String(error)}`);
+    this.logger.error(`Bulk update error: ${error instanceof Error ? error.message : String(error)}`, { component: 'BulkOperations', action: 'bulkUpdateMembers' });
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

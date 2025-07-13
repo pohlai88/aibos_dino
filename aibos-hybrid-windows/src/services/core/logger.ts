@@ -1,7 +1,7 @@
 export interface LogContext {
   component: string;
   action: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Logger {
@@ -12,8 +12,8 @@ export interface Logger {
 }
 
 export class EnterpriseLogger implements Logger {
-  private isDevelopment = process.env.NODE_ENV === 'development';
-  private logBuffer: Array<{ level: string; message: string; context?: LogContext; timestamp: string }> = [];
+  private isDevelopment = Deno.env.get('NODE_ENV') === 'development';
+  private logBuffer: Array<{ level: string; message: string; context: LogContext | undefined; timestamp: string }> = [];
   private maxBufferSize = 1000;
 
   info(message: string, context?: LogContext): void {
@@ -38,7 +38,7 @@ export class EnterpriseLogger implements Logger {
   }
 
   private log(level: string, message: string, context?: LogContext): void {
-    const entry = { level, message, context, timestamp: new Date().toISOString() };
+    const entry = { level, message, context: context ?? undefined, timestamp: new Date().toISOString() };
 
     if (this.isDevelopment) {
       const consoleMethod =

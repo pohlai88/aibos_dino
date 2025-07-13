@@ -3,8 +3,7 @@
  * Provides utilities for optimizing search performance and user experience
  */
 
-// REMOVED: import { logInfo, logWarn } from '../../modules/logging.ts';
-import { EnterpriseLogger } from '../services/core/logger';
+import { EnterpriseLogger } from '../services/core/logger.ts';
 
 export interface SearchPerformanceMetrics {
   queryLength: number;
@@ -45,11 +44,11 @@ class SearchPerformanceOptimizer {
     performanceMonitoring: true,
   };
 
-  private searchCache = new Map<string, { results: any[]; timestamp: number }>();
+  private searchCache = new Map<string, { results: unknown[]; timestamp: number }>();
   private performanceHistory: SearchPerformanceMetrics[] = [];
 
   // In-flight promise for debounce
-  private inflightPromise: Promise<any[]> | null = null;
+  private inflightPromise: Promise<unknown[]> | null = null;
   private inflightQuery: string | null = null;
 
   /**
@@ -83,7 +82,7 @@ class SearchPerformanceOptimizer {
   /**
    * Get cached results if available
    */
-  getCachedResults(query: string): any[] | null {
+  getCachedResults(query: string): unknown[] | null {
     const cacheKey = this.generateCacheKey(query);
     const cached = this.searchCache.get(cacheKey);
 
@@ -97,7 +96,7 @@ class SearchPerformanceOptimizer {
   /**
    * Cache search results
    */
-  cacheResults(query: string, results: any[]): void {
+  cacheResults(query: string, results: unknown[]): void {
     const cacheKey = this.generateCacheKey(query);
     this.searchCache.set(cacheKey, {
       results,
@@ -117,7 +116,7 @@ class SearchPerformanceOptimizer {
     options: {
       useCache?: boolean;
       fuzzySearch?: boolean;
-      filters?: any;
+      filters?: unknown;
       maxResults?: number;
     } = {}
   ): Promise<{ results: T[]; metrics: SearchPerformanceMetrics }> {
@@ -271,7 +270,7 @@ class SearchPerformanceOptimizer {
    */
   updateConfig(newConfig: Partial<SearchPerformanceConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    logInfo('Search performance config updated');
+    this.logger.info('Search performance config updated', { component: 'SearchPerformance', action: 'updateConfig' });
   }
 
   /**
@@ -280,7 +279,7 @@ class SearchPerformanceOptimizer {
   clearPerformanceData(): void {
     this.performanceHistory = [];
     this.searchCache.clear();
-    logInfo('Search performance data cleared');
+    this.logger.info('Search performance data cleared', { component: 'SearchPerformance', action: 'clearPerformanceData' });
   }
 
   /**
@@ -322,7 +321,7 @@ class SearchPerformanceOptimizer {
       this.performanceHistory.splice(0, this.performanceHistory.length - 1000);
     }
     if (metrics.searchTime > 100) {
-      logWarn(`Slow search detected: ${metrics.searchTime.toFixed(2)}ms for query \"${metrics.queryLength} chars\"`);
+      this.logger.warn(`Slow search detected: ${metrics.searchTime.toFixed(2)}ms for query \"${metrics.queryLength} chars\"`, { component: 'SearchPerformance', action: 'recordMetrics' });
     }
   }
 }

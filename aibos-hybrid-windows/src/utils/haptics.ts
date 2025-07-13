@@ -166,9 +166,9 @@ export const HAPTIC_PATTERNS: Record<string, HapticPattern> = {
 
 // Enterprise: Logger interface
 export interface HapticLogger {
-  log: (msg: string, ...args: any[]) => void;
-  warn: (msg: string, ...args: any[]) => void;
-  error: (msg: string, ...args: any[]) => void;
+  log: (msg: string, ...args: unknown[]) => void;
+  warn: (msg: string, ...args: unknown[]) => void;
+  error: (msg: string, ...args: unknown[]) => void;
 }
 
 // Enterprise: Device profile interface
@@ -207,10 +207,10 @@ class HapticManager {
   // NEW: Check for accessibility preferences
   private checkAccessibilityMode(): void {
     if (typeof window !== 'undefined') {
-      this.accessibilityMode = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      this.accessibilityMode = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
       
       // Listen for changes
-      window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
+      globalThis.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => {
         this.accessibilityMode = e.matches;
         this.logger?.log?.('Accessibility mode changed:', this.accessibilityMode);
       });
@@ -262,7 +262,7 @@ class HapticManager {
   }
 
   // Enterprise: Set active device profile
-  setActiveProfile(profileId: string) {
+  setActiveProfile(_profileId: string) {
     // This method is no longer needed as activeProfile is removed.
     // Keeping it here for now, but it will be removed in a subsequent edit.
     // this.activeProfile = this.deviceProfiles.find(p => p.id === profileId) || null;
@@ -330,12 +330,12 @@ class HapticManager {
     }
 
     // Check for WebKit vibration support
-    if ('vibrate' in (navigator as any)) {
+    if ('vibrate' in (navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean })) {
       return true;
     }
 
-    // Check for experimental vibration support
-    if ((navigator as any).vibrate || (navigator as any).mozVibrate) {
+          // Check for experimental vibration support
+      if ((navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate || (navigator as Navigator & { mozVibrate?: (pattern: number | number[]) => boolean }).mozVibrate) {
       return true;
     }
 
@@ -391,14 +391,14 @@ class HapticManager {
         Math.round(duration * this.config.intensity)
       );
 
-      // Use the appropriate vibration API
-      if ('vibrate' in navigator) {
-        navigator.vibrate(scaledPattern);
-      } else if ((navigator as any).vibrate) {
-        (navigator as any).vibrate(scaledPattern);
-      } else if ((navigator as any).mozVibrate) {
-        (navigator as any).mozVibrate(scaledPattern);
-      }
+              // Use the appropriate vibration API
+        if ('vibrate' in navigator) {
+          (navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate?.(scaledPattern);
+        } else if ((navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate) {
+          (navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate?.(scaledPattern);
+        } else if ((navigator as Navigator & { mozVibrate?: (pattern: number | number[]) => boolean }).mozVibrate) {
+          (navigator as Navigator & { mozVibrate?: (pattern: number | number[]) => boolean }).mozVibrate?.(scaledPattern);
+        }
 
       // NEW: Calculate total duration and resolve Promise when done
       const totalDuration = scaledPattern.reduce((acc, duration) => acc + duration, 0);
@@ -568,14 +568,14 @@ class HapticManager {
   // Stop vibration
   stop(): void {
     if (this.isSupported) {
-      try {
-        if ('vibrate' in navigator) {
-          navigator.vibrate(0);
-        } else if ((navigator as any).vibrate) {
-          (navigator as any).vibrate(0);
-        } else if ((navigator as any).mozVibrate) {
-          (navigator as any).mozVibrate(0);
-        }
+              try {
+          if ('vibrate' in navigator) {
+            (navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate?.(0);
+          } else if ((navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate) {
+            (navigator as Navigator & { vibrate?: (pattern: number | number[]) => boolean }).vibrate?.(0);
+          } else if ((navigator as Navigator & { mozVibrate?: (pattern: number | number[]) => boolean }).mozVibrate) {
+            (navigator as Navigator & { mozVibrate?: (pattern: number | number[]) => boolean }).mozVibrate?.(0);
+          }
         
         // NEW: Reset vibration state
         this.isVibrating = false;

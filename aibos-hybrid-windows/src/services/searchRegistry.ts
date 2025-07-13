@@ -1,7 +1,7 @@
 import { SearchProvider, SearchResult, SearchRegistry } from '../types/search.ts';
 import { EnterpriseLogger } from './core/logger';
 
-class SearchRegistryImpl implements SearchRegistry {
+class _SearchRegistryImpl implements SearchRegistry {
   private providers = new Map<string, SearchProvider>();
   private logger = new EnterpriseLogger();
 
@@ -75,7 +75,7 @@ class SearchRegistryImpl implements SearchRegistry {
     const now = Date.now();
     
     // Check cache first
-    if (this.quickAccessCache && (now - (this.quickAccessCache as any).timestamp < this.quickAccessCacheTTL)) {
+    if (this.quickAccessCache && (now - (this.quickAccessCache as { timestamp: number }).timestamp < this.quickAccessCacheTTL)) {
       return this.quickAccessCache.slice(0, limit);
     }
 
@@ -96,8 +96,8 @@ class SearchRegistryImpl implements SearchRegistry {
     const combined = this.sortResults(allQuickAccess.flat(), '');
     
     // Cache the results with timestamp
-    this.quickAccessCache = combined as any;
-    (this.quickAccessCache as any).timestamp = now;
+    this.quickAccessCache = combined as SearchResult[] & { timestamp: number };
+    (this.quickAccessCache as SearchResult[] & { timestamp: number }).timestamp = now;
     
     return combined.slice(0, limit);
   }

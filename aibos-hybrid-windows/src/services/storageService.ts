@@ -1,6 +1,6 @@
 export interface StorageItem {
   key: string;
-  value: any;
+  value: unknown;
   timestamp: number;
   size: number;
 }
@@ -35,7 +35,7 @@ class StorageService {
     });
   }
 
-  async setItem(key: string, value: any): Promise<void> {
+  async setItem(key: string, value: unknown): Promise<void> {
     const serialized = JSON.stringify(value);
     const size = new Blob([serialized]).size;
     
@@ -57,7 +57,7 @@ class StorageService {
     return this.getLocalStorage<T>(key);
   }
 
-  private async setIndexedDB(key: string, value: any, size: number): Promise<void> {
+  private async setIndexedDB(key: string, value: unknown, size: number): Promise<void> {
     if (!this.db) throw new Error('IndexedDB not initialized');
     
     return new Promise((resolve, reject) => {
@@ -77,7 +77,7 @@ class StorageService {
     });
   }
 
-  private setLocalStorage(key: string, value: any): void {
+  private setLocalStorage(key: string, value: unknown): void {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {

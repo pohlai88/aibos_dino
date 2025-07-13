@@ -26,8 +26,8 @@ export type SystemEvents = {
   'storage:updated': { total: number; available: number; used: number };
 };
 
-class TypedEventEmitter<T extends Record<string, any>> {
-  private listeners: Map<keyof T, Set<(data: any) => void>> = new Map();
+class TypedEventEmitter<T extends Record<string, unknown>> {
+  private listeners: Map<keyof T, Set<(data: unknown) => void>> = new Map();
 
   on<K extends keyof T>(event: K, handler: (data: T[K]) => void): () => void {
     if (!this.listeners.has(event)) {

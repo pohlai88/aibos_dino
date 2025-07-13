@@ -128,8 +128,8 @@ class WindowSnappingManager {
     if (typeof window === 'undefined') return;
 
     // For now, use single monitor approach until we integrate monitorManager
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
+    const screenWidth = globalThis.innerWidth;
+    const screenHeight = globalThis.innerHeight;
     const margin = 20;
 
     this.snapZones = [
@@ -310,8 +310,8 @@ class WindowSnappingManager {
 
     // Snap to edges
     if (this.config.snapToEdges) {
-      const screenWidth = window.innerWidth;
-      const screenHeight = window.innerHeight;
+      const screenWidth = globalThis.innerWidth;
+      const screenHeight = globalThis.innerHeight;
 
       // Left edge
       if (this.isNearEdge(newX, 0)) {
@@ -410,8 +410,8 @@ class WindowSnappingManager {
     }
 
     // Ensure window stays within bounds
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
+    const screenWidth = globalThis.innerWidth;
+    const screenHeight = globalThis.innerHeight;
     
     newX = Math.max(0, Math.min(newX, screenWidth - newWidth));
     newY = Math.max(0, Math.min(newY, screenHeight - newHeight));
@@ -433,7 +433,7 @@ class WindowSnappingManager {
         clearTimeout(this.debounceTimer);
       }
       
-      this.debounceTimer = window.setTimeout(() => {
+      this.debounceTimer = globalThis.setTimeout(() => {
         const result = this.calculateSnap(windowBounds, isDragging);
         resolve(result);
       }, this.config.debounceMs);
@@ -466,7 +466,7 @@ class WindowSnappingManager {
   private updateSnapZonesIfNeeded(): void {
     if (typeof window === 'undefined') return;
     
-    const currentSize = { width: window.innerWidth, height: window.innerHeight };
+    const currentSize = { width: globalThis.innerWidth, height: globalThis.innerHeight };
     
     // Only update if window size actually changed
     if (currentSize.width === this.lastWindowSize.width && 

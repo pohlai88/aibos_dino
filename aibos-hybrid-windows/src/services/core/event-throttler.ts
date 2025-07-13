@@ -2,8 +2,8 @@ export class EventThrottler {
   private timers = new Map<string, number>();
   private lastExecution = new Map<string, number>();
 
-  throttle<T extends (...args: any[]) => void>(key: string, fn: T, delay: number): T {
-    return ((...args: any[]) => {
+  throttle<T extends (...args: unknown[]) => void>(key: string, fn: T, delay: number): T {
+    return ((...args: unknown[]) => {
       const now = Date.now();
       const last = this.lastExecution.get(key) || 0;
 
@@ -14,7 +14,7 @@ export class EventThrottler {
         if (this.timers.has(key)) {
           clearTimeout(this.timers.get(key)!);
         }
-        const timer = window.setTimeout(() => {
+        const timer = globalThis.setTimeout(() => {
           this.lastExecution.set(key, Date.now());
           fn(...args);
           this.timers.delete(key);

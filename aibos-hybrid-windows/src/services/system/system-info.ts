@@ -30,7 +30,7 @@ export class SystemInfoService {
   startMonitoring(): void {
     if (this.isMonitoring) return;
 
-    this.updateInterval = window.setInterval(() => this.updateSystemInfo(), 5000);
+    this.updateInterval = globalThis.setInterval(() => this.updateSystemInfo(), 5000);
     this.updateSystemInfo();
     this.setupNetworkListeners();
     this.isMonitoring = true;
@@ -42,10 +42,10 @@ export class SystemInfoService {
   }
 
   private setupNetworkListeners(): void {
-    window.addEventListener('online', () => {
+    globalThis.addEventListener('online', () => {
       this.systemInfo.network.status = 'online';
     });
-    window.addEventListener('offline', () => {
+    globalThis.addEventListener('offline', () => {
       this.systemInfo.network.status = 'offline';
     });
   }
@@ -54,7 +54,7 @@ export class SystemInfoService {
     try {
       // Memory
       if ('memory' in performance) {
-        const memory = (performance as any).memory;
+        const memory = (performance as Performance & { memory?: { jsHeapSizeLimit: number; usedJSHeapSize: number } }).memory;
         if (memory?.jsHeapSizeLimit) {
           this.systemInfo.memory = {
             total: memory.jsHeapSizeLimit,

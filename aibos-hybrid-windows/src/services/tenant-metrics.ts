@@ -1,14 +1,13 @@
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 import { supabase } from '../../modules/supabase-client.ts';
-// REMOVED: import { logError, logInfo } from '../../modules/logging.ts';
 import { ApiResponse } from '../../modules/types.ts';
 
-class TenantMetricsService {
+class _TenantMetricsService {
   private logger = new EnterpriseLogger();
 }
 
 // Heavy tenant metrics operations (lazy loaded)
-export async function getTenantMetrics(tenantId: string): Promise<ApiResponse<any>> {
+export async function getTenantMetrics(tenantId: string): Promise<ApiResponse<Record<string, unknown>>> {
   const logger = new EnterpriseLogger();
   
   try {
@@ -44,19 +43,19 @@ export async function getTenantMetrics(tenantId: string): Promise<ApiResponse<an
   }
 }
 
-export async function getAdvancedAnalytics(tenantId: string): Promise<ApiResponse<any>> {
+export async function getAdvancedAnalytics(tenantId: string): Promise<ApiResponse<Record<string, unknown>>> {
   try {
     const { data, error } = await supabase
       .rpc('get_advanced_analytics', { p_tenant_id: tenantId });
 
     if (error) {
-      logError(`Failed to fetch analytics: ${error.message}`);
+      this.logger.error(`Failed to fetch analytics: ${error.message}`, { component: 'TenantMetrics', action: 'getAdvancedAnalytics' });
       return { success: false, error: error.message };
     }
 
     return { success: true, data: data || {} };
   } catch (error) {
-    logError(`Analytics error: ${error instanceof Error ? error.message : String(error)}`);
+    this.logger.error(`Analytics error: ${error instanceof Error ? error.message : String(error)}`, { component: 'TenantMetrics', action: 'getAdvancedAnalytics' });
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

@@ -58,7 +58,7 @@ export function usePerformanceMonitor(componentName: string) {
     const timeSinceLastRender = currentTime - lastRenderTime.current;
     
     // Check if we're in development mode (Deno doesn't have process.env)
-    const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const isDevelopment = typeof window !== 'undefined' && globalThis.location.hostname === 'localhost';
     
     if (isDevelopment) {
       console.log(`🔄 ${componentName} rendered (${renderCount.current} times, ${timeSinceLastRender.toFixed(2)}ms since last render)`);

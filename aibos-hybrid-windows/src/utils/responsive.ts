@@ -59,9 +59,9 @@ export function getDeviceInfo(): DeviceInfo {
     };
   }
 
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  const pixelRatio = window.devicePixelRatio || 1;
+  const screenWidth = globalThis.innerWidth;
+  const screenHeight = globalThis.innerHeight;
+  const pixelRatio = globalThis.devicePixelRatio || 1;
 
   // Check for touch capability
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -94,7 +94,7 @@ export function matchesBreakpoint(breakpoint: keyof typeof breakpoints): boolean
   if (typeof window === 'undefined') return false;
   
   const breakpointValue = parseInt(breakpoints[breakpoint]);
-  return window.innerWidth >= breakpointValue;
+  return globalThis.innerWidth >= breakpointValue;
 }
 
 /**
@@ -104,7 +104,7 @@ export function isSmallerThan(breakpoint: keyof typeof breakpoints): boolean {
   if (typeof window === 'undefined') return false;
   
   const breakpointValue = parseInt(breakpoints[breakpoint]);
-  return window.innerWidth < breakpointValue;
+  return globalThis.innerWidth < breakpointValue;
 }
 
 /**
@@ -114,7 +114,7 @@ export function isLargerThan(breakpoint: keyof typeof breakpoints): boolean {
   if (typeof window === 'undefined') return false;
   
   const breakpointValue = parseInt(breakpoints[breakpoint]);
-  return window.innerWidth > breakpointValue;
+  return globalThis.innerWidth > breakpointValue;
 }
 
 // ============================================================================
@@ -376,12 +376,12 @@ export function useDeviceInfo(): DeviceInfo {
     };
 
     // Update on resize and orientation change
-    window.addEventListener('resize', updateDeviceInfo);
-    window.addEventListener('orientationchange', updateDeviceInfo);
+    globalThis.addEventListener('resize', updateDeviceInfo);
+    globalThis.addEventListener('orientationchange', updateDeviceInfo);
 
     return () => {
-      window.removeEventListener('resize', updateDeviceInfo);
-      window.removeEventListener('orientationchange', updateDeviceInfo);
+      globalThis.removeEventListener('resize', updateDeviceInfo);
+      globalThis.removeEventListener('orientationchange', updateDeviceInfo);
     };
   }, []);
 
@@ -412,7 +412,7 @@ export function useResponsiveConfig() {
 /**
  * Debounce function for responsive updates
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -427,7 +427,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle function for responsive updates
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {

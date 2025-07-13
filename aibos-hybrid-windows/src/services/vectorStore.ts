@@ -2,21 +2,24 @@
  * Vector Database Integration for Scalable Semantic Search
  */
 
+import { EnterpriseLogger } from './core/logger.ts';
+
 export interface VectorStore {
-  upsertVector(id: string, vector: number[], metadata: Record<string, any>): Promise<void>;
-  searchSimilar(queryVector: number[], topK: number, filter?: Record<string, any>): Promise<Array<{
+  upsertVector(id: string, vector: number[], metadata: Record<string, unknown>): Promise<void>;
+  searchSimilar(queryVector: number[], topK: number, filter?: Record<string, unknown>): Promise<Array<{
     id: string;
     score: number;
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
   }>>;
   deleteVector(id: string): Promise<void>;
 }
 
 // Supabase Vector Store Implementation
 export class SupabaseVectorStore implements VectorStore {
+  private logger = new EnterpriseLogger();
   constructor(private tenantId: string) {}
 
-  async upsertVector(id: string, vector: number[], metadata: Record<string, any>): Promise<void> {
+  async upsertVector(id: string, vector: number[], metadata: Record<string, unknown>): Promise<void> {
     const { error } = await supabase
       .from('file_vectors')
       .upsert({
@@ -33,8 +36,8 @@ export class SupabaseVectorStore implements VectorStore {
   async searchSimilar(
     queryVector: number[], 
     topK: number, 
-    filter?: Record<string, any>
-  ): Promise<Array<{ id: string; score: number; metadata: Record<string, any> }>> {
+    filter?: Record<string, unknown>
+  ): Promise<Array<{ id: string; score: number; metadata: Record<string, unknown> }>> {
     // Use Supabase's vector similarity search
     const { data, error } = await supabase.rpc('search_similar_vectors', {
       query_embedding: queryVector,
@@ -60,8 +63,9 @@ export class SupabaseVectorStore implements VectorStore {
 }
 
 // Enhanced FileIndexerService with Vector Store
-class FileIndexerService {
+class _FileIndexerService {
   private vectorStore: VectorStore;
+  private logger = new EnterpriseLogger();
   
   constructor(tenantId: string = 'default') {
     this.tenantId = tenantId;
@@ -119,7 +123,7 @@ class FileIndexerService {
         metadata.readingTime = this.calculateReadingTime(extractionResult.text);
       }
     } catch (error) {
-      logWarn(`Failed to enhance semantic data for ${metadata.path}: ${error}`);
+      this.logger.warn(`Failed to enhance semantic data for ${metadata.path}: ${error}`, { component: 'VectorStore', action: 'enhanceSemanticData', metadata: { path: metadata.path } });
     }
   }
 }

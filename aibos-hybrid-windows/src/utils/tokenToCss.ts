@@ -4,7 +4,7 @@ import { designTokens } from './designTokens.ts';
 // TOKEN TO CSS UTILITIES
 // ============================================================================
 
-type TokenObject = Record<string, string | Record<string, any>>;
+type TokenObject = Record<string, string | Record<string, unknown>>;
 
 /**
  * Converts a token object to CSS variables

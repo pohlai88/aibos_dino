@@ -102,7 +102,7 @@ class ContextMenuService {
     return null;
   }
 
-  private getFileContextMenuItems(filePath: string, fileName: string, isDirectory: boolean): ContextMenuItem[] {
+  private getFileContextMenuItems(filePath: string, _fileName: string, isDirectory: boolean): ContextMenuItem[] {
     const items: ContextMenuItem[] = [
       {
         id: 'open',
@@ -195,7 +195,7 @@ class ContextMenuService {
   private getOpenWithSubmenu(filePath: string): ContextMenuItem[] {
     const extension = '.' + filePath.split('.').pop()?.toLowerCase();
     const associations = fileAssociationService.getRegisteredAssociations();
-    const relevantApps = associations.filter(a => a.extension === extension);
+    const _relevantApps = associations.filter(a => a.extension === extension);
 
     const items: ContextMenuItem[] = [
       {
@@ -490,8 +490,8 @@ class ContextMenuService {
 
   private positionMenu(menu: HTMLElement, position: { x: number; y: number }): void {
     const rect = menu.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const viewportWidth = globalThis.innerWidth;
+    const viewportHeight = globalThis.innerHeight;
     
     let x = position.x;
     let y = position.y;
@@ -532,7 +532,7 @@ class ContextMenuService {
   private async openWithSystemDefault(filePath: string): Promise<void> {
     // Use File System Access API or fallback
     if ('showOpenFilePicker' in window) {
-      window.open(filePath, '_blank');
+      globalThis.open(filePath, '_blank');
     }
   }
 

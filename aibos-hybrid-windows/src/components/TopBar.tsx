@@ -18,7 +18,7 @@ const Logo: React.FC = memo(() => {
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -79,7 +79,7 @@ const WindowGroupsButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) =
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -119,7 +119,7 @@ const GridLayoutButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) => 
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -153,7 +153,7 @@ const NotificationButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) =
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -215,7 +215,7 @@ const ThemeToggle: React.FC = memo(() => {
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -370,7 +370,7 @@ const NotificationIndicator: React.FC = memo(() => {
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -425,7 +425,7 @@ const SearchButton: React.FC = memo(() => {
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -470,7 +470,7 @@ const TopBar: React.FC<TopBarProps> = ({ className = '', onOpenWindowGroups, onO
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 

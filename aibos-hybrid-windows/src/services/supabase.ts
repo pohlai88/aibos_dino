@@ -1,6 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-// REMOVED: import { logError } from '../../modules/logging.ts';
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 // Types for file system operations
 export interface FileSystemItem {
@@ -42,7 +41,7 @@ export interface FileSystemSettings {
   updated_at: string;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -69,6 +68,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // File System Service Class
 export class FileSystemService {
   private supabase;
+  private logger = new EnterpriseLogger();
 
   constructor() {
     this.supabase = supabase;
@@ -532,12 +532,12 @@ export class FileSystemService {
           performed_by: user.id
         });
     } catch (error) {
-      logError(`Failed to log operation: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Failed to log operation: ${error instanceof Error ? error.message : String(error)}`, { component: 'SupabaseService', action: 'logOperation' });
     }
   }
 
   // Real-time subscriptions
-  subscribeToFileSystemChanges(callback: (payload: any) => void) {
+  subscribeToFileSystemChanges(callback: (payload: Record<string, unknown>) => void) {
     return this.supabase
       .channel('file_system_changes')
       .on(
@@ -552,7 +552,7 @@ export class FileSystemService {
       .subscribe();
   }
 
-  subscribeToOperations(callback: (payload: any) => void) {
+  subscribeToOperations(callback: (payload: Record<string, unknown>) => void) {
     return this.supabase
       .channel('operations_changes')
       .on(
@@ -571,7 +571,7 @@ export class FileSystemService {
 // Export singleton instance
 export const fileSystemService = new FileSystemService();
 
-class SupabaseService {
+class _SupabaseService {
   private logger = new EnterpriseLogger();
   
   // Replace all logging calls:

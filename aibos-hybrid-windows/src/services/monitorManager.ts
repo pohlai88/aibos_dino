@@ -31,7 +31,7 @@ export type MonitorEvent = 'monitorsChanged' | 'monitorAssigned' | 'primaryMonit
 class MonitorManager {
   private monitors: MonitorInfo[] = [];
   private assignments: Map<string, string> = new Map(); // windowId -> monitorId
-  private listeners: Map<MonitorEvent, Set<(...args: any[]) => void>> = new Map();
+  private listeners: Map<MonitorEvent, Set<(...args: unknown[]) => void>> = new Map();
   private isInitialized = false;
   private detecting = false; // Prevent concurrent detection calls
   private lastPrimaryMonitorId: string | null = null; // Track primary monitor changes
@@ -86,8 +86,8 @@ class MonitorManager {
       // Browser: use window.screen and window.getScreenDetails (if available)
       if (typeof window !== 'undefined' && 'getScreenDetails' in window) {
         // Experimental: Multi-Screen Window Placement API
-        const details = await (window as any).getScreenDetails();
-        this.monitors = details.screens.map((screen: any, idx: number) => ({
+        const details = await (globalThis as typeof globalThis & { getScreenDetails?: () => Promise<{ screens: Screen[] }> }).getScreenDetails?.();
+        this.monitors = details.screens.map((screen: Record<string, unknown>, _idx: number) => ({
           id: this.generateMonitorId(screen),
           bounds: {
             x: screen.left,
@@ -96,25 +96,25 @@ class MonitorManager {
             height: screen.height,
           },
           dpi: this.getPhysicalDPI(screen),
-          scaleFactor: screen.devicePixelRatio || window.devicePixelRatio || 1,
+          scaleFactor: screen.devicePixelRatio || globalThis.devicePixelRatio || 1,
           isPrimary: !!screen.isPrimary,
           orientation: this.detectOrientation(screen),
           name: screen.label || undefined,
         }));
-      } else if (typeof window !== 'undefined' && window.screen) {
+      } else if (typeof window !== 'undefined' && globalThis.screen) {
         // Fallback: single screen
         this.monitors = [{
-          id: this.generateMonitorId(window.screen),
+          id: this.generateMonitorId(globalThis.screen),
           bounds: {
             x: 0,
             y: 0,
-            width: window.screen.width,
-            height: window.screen.height,
+            width: globalThis.screen.width,
+            height: globalThis.screen.height,
           },
-          dpi: this.getPhysicalDPI(window.screen),
-          scaleFactor: window.devicePixelRatio || 1,
+          dpi: this.getPhysicalDPI(globalThis.screen),
+          scaleFactor: globalThis.devicePixelRatio || 1,
           isPrimary: true,
-          orientation: this.detectOrientation(window.screen),
+          orientation: this.detectOrientation(globalThis.screen),
           name: 'Primary Display',
         }];
       } else {
@@ -162,14 +162,14 @@ class MonitorManager {
   /**
    * Generate unique monitor ID based on bounds
    */
-  private generateMonitorId(screen: any): string {
+  private generateMonitorId(screen: Record<string, unknown>): string {
     return `monitor-${screen.width}x${screen.height}-${Date.now()}`;
   }
 
   /**
    * Get physical DPI (separate from scale factor)
    */
-  private getPhysicalDPI(screen: any): number {
+  private getPhysicalDPI(screen: Record<string, unknown>): number {
     // Try to get actual physical DPI if available
     if (screen.devicePixelRatio && screen.width && screen.height) {
       // Estimate based on common DPI values and screen size
@@ -183,7 +183,7 @@ class MonitorManager {
   /**
    * Detect screen orientation with fallback
    */
-  private detectOrientation(screen: any): 'landscape' | 'portrait' {
+  private detectOrientation(screen: Record<string, unknown>): 'landscape' | 'portrait' {
     // Try modern API first
     if (screen.orientation?.type?.includes('portrait')) {
       return 'portrait';
@@ -218,12 +218,12 @@ class MonitorManager {
    * Save assignments to localStorage
    */
   private saveAssignments(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== 'undefined' && globalThis.localStorage) {
       const obj: Record<string, string> = {};
       for (const [win, mon] of this.assignments.entries()) {
         obj[win] = mon;
       }
-      window.localStorage.setItem(MonitorManager.ASSIGNMENTS_KEY, JSON.stringify(obj));
+      globalThis.localStorage.setItem(MonitorManager.ASSIGNMENTS_KEY, JSON.stringify(obj));
     }
   }
 
@@ -231,8 +231,8 @@ class MonitorManager {
    * Restore assignments from localStorage
    */
   private restoreAssignments(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem(MonitorManager.ASSIGNMENTS_KEY);
+    if (typeof window !== 'undefined' && globalThis.localStorage) {
+      const raw = globalThis.localStorage.getItem(MonitorManager.ASSIGNMENTS_KEY);
       if (raw) {
         try {
           const obj = JSON.parse(raw);
@@ -248,12 +248,12 @@ class MonitorManager {
    * Save monitor names to localStorage
    */
   private saveMonitorNames(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== 'undefined' && globalThis.localStorage) {
       const obj: Record<string, string> = {};
       for (const [id, name] of this.monitorNames.entries()) {
         obj[id] = name;
       }
-      window.localStorage.setItem(MonitorManager.NAMES_KEY, JSON.stringify(obj));
+      globalThis.localStorage.setItem(MonitorManager.NAMES_KEY, JSON.stringify(obj));
     }
   }
 
@@ -261,8 +261,8 @@ class MonitorManager {
    * Restore monitor names from localStorage
    */
   private restoreMonitorNames(): void {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem(MonitorManager.NAMES_KEY);
+    if (typeof window !== 'undefined' && globalThis.localStorage) {
+      const raw = globalThis.localStorage.getItem(MonitorManager.NAMES_KEY);
       if (raw) {
         try {
           const obj = JSON.parse(raw);
@@ -293,14 +293,14 @@ class MonitorManager {
    * Listen for monitor hot-plug events (browser only)
    */
   private setupHotPlugListener(): void {
-    if (typeof window !== 'undefined' && window.addEventListener) {
+    if (typeof window !== 'undefined' && globalThis.addEventListener) {
       // Use addEventListener instead of overwriting onscreenchange
-      window.addEventListener('screenschange', () => {
+      globalThis.addEventListener('screenschange', () => {
         this.detectMonitors();
       });
     } else if (typeof window !== 'undefined' && 'onscreenschange' in window) {
       // Fallback for older browsers
-      (window as any).onscreenschange = () => {
+      (globalThis as typeof globalThis & { oncreenschange?: () => void }).onscreenschange = () => {
         this.detectMonitors();
       };
     }
@@ -386,13 +386,13 @@ class MonitorManager {
   /**
    * Event subscription
    */
-  on(event: MonitorEvent, listener: (...args: any[]) => void): void {
+  on(event: MonitorEvent, listener: (...args: unknown[]) => void): void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
     this.listeners.get(event)!.add(listener);
   }
-  off(event: MonitorEvent, listener: (...args: any[]) => void): void {
+  off(event: MonitorEvent, listener: (...args: unknown[]) => void): void {
     this.listeners.get(event)?.delete(listener);
   }
 
@@ -407,7 +407,7 @@ class MonitorManager {
     }
   }
 
-  private emit(event: MonitorEvent, ...args: any[]): void {
+  private emit(event: MonitorEvent, ...args: unknown[]): void {
     this.listeners.get(event)?.forEach(fn => fn(...args));
   }
 }

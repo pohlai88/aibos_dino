@@ -5,9 +5,11 @@
  * to improve initial bundle size and loading performance.
  */
 
-import { EnterpriseLogger } from '../services/core/logger';
+import { EnterpriseLogger } from '../services/core/logger.ts';
 
-class CodeSplittingManager {
+const logger = new EnterpriseLogger();
+
+class _CodeSplittingManager {
   private logger = new EnterpriseLogger();
   
   // Replace:
@@ -37,7 +39,7 @@ export async function dynamicImport<T>(
       return await importFunc();
     } catch (error) {
       lastError = error as Error;
-      logWarn(`Import attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
+      logger.warn(`Import attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`, { component: 'CodeSplitting', action: 'dynamicImport' });
       
       if (attempt < maxRetries) {
         // Wait before retrying (exponential backoff)
@@ -77,7 +79,7 @@ export function preloadCriticalComponents() {
   // Use requestIdleCallback if available, otherwise setTimeout
   const schedulePreload = (callback: () => void) => {
     if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(callback);
+      (globalThis as typeof globalThis & { requestIdleCallback?: (callback: () => void) => void }).requestIdleCallback?.(callback);
     } else {
       setTimeout(callback, 1000);
     }
@@ -86,7 +88,7 @@ export function preloadCriticalComponents() {
   schedulePreload(() => {
     criticalComponents.forEach(importFunc => {
       importFunc().catch(error => {
-        logWarn(`Failed to preload component: ${error instanceof Error ? error.message : String(error)}`);
+        logger.warn(`Failed to preload component: ${error instanceof Error ? error.message : String(error)}`, { component: 'CodeSplitting', action: 'preloadCriticalComponents' });
       });
     });
   });
@@ -94,16 +96,16 @@ export function preloadCriticalComponents() {
 
 // Component loading registry
 export class ComponentRegistry {
-  private static cache = new Map<string, Promise<any>>();
+  private static cache = new Map<string, Promise<unknown>>();
   
-  static async loadComponent(name: string, importFunc: () => Promise<any>) {
+  static async loadComponent(name: string, importFunc: () => Promise<unknown>) {
     if (!this.cache.has(name)) {
       this.cache.set(name, importFunc());
     }
     return this.cache.get(name);
   }
   
-  static preloadComponent(name: string, importFunc: () => Promise<any>) {
+  static preloadComponent(name: string, importFunc: () => Promise<unknown>) {
     if (!this.cache.has(name)) {
       this.cache.set(name, importFunc());
     }

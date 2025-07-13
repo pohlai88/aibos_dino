@@ -77,7 +77,7 @@ class AdvancedCommandManager {
       execute: () => {
         const isPerformanceMode = localStorage.getItem('aibos-performance-mode') === 'true';
         localStorage.setItem('aibos-performance-mode', (!isPerformanceMode).toString());
-        window.location.reload();
+        globalThis.location.reload();
       }
     });
 
@@ -90,7 +90,7 @@ class AdvancedCommandManager {
       execute: () => {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.reload();
+        globalThis.location.reload();
       }
     });
 

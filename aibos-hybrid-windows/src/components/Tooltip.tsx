@@ -42,7 +42,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = React.useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -139,8 +139,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
           const tooltip = tooltipRef.current;
           const tooltipRect = tooltip.getBoundingClientRect();
           
-          const viewportWidth = window.innerWidth;
-          const viewportHeight = window.innerHeight;
+          const viewportWidth = globalThis.innerWidth;
+          const viewportHeight = globalThis.innerHeight;
           
           // Reset any previous adjustments
           tooltip.style.left = '';
@@ -262,9 +262,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
       
       // Check on window resize
       const handleResize = () => checkViewportPosition();
-      window.addEventListener('resize', handleResize);
+      globalThis.addEventListener('resize', handleResize);
       
-      return () => window.removeEventListener('resize', handleResize);
+      return () => globalThis.removeEventListener('resize', handleResize);
     }
   }, [isVisible, checkViewportPosition]);
 

@@ -211,9 +211,9 @@ export function setSoundRegistry(registry: Record<string, SoundEffect>) {
 
 // Enterprise: Logger interface
 export interface AudioLogger {
-  log: (msg: string, ...args: any[]) => void;
-  warn: (msg: string, ...args: any[]) => void;
-  error: (msg: string, ...args: any[]) => void;
+  log: (msg: string, ...args: unknown[]) => void;
+  warn: (msg: string, ...args: unknown[]) => void;
+  error: (msg: string, ...args: unknown[]) => void;
 }
 
 // Enterprise: Device profile interface
@@ -273,7 +273,7 @@ class AudioManager {
   }
 
   // Enterprise: Set active device profile
-  setActiveProfile(profileId: string) {
+  setActiveProfile(_profileId: string) {
     // This method is no longer used, but keeping it for now as it's not explicitly removed.
     // The activeProfile variable was removed from the class.
   }
@@ -346,14 +346,14 @@ class AudioManager {
 
     try {
       // Check if audio is supported
-      if (!window.AudioContext && !(window as any).webkitAudioContext) {
+      if (!globalThis.AudioContext && !(globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) {
         console.warn('AudioContext not supported');
         this.config.enabled = false;
         return;
       }
 
       // Initialize AudioContext
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = globalThis.AudioContext || (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       this.audioContext = new AudioContextClass();
       
       // Resume context if suspended (required by some browsers)
@@ -578,7 +578,7 @@ class AudioManager {
     const event = new CustomEvent('aibos-audio-announcement', { 
       detail: { message, timestamp: Date.now() } 
     });
-    window.dispatchEvent(event);
+    globalThis.dispatchEvent(event);
   }
 
   // NEW: Global mute toggle

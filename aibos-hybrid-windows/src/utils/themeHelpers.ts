@@ -11,18 +11,18 @@ import type { ColorPaths, GradientPaths } from './designTokens.ts';
 export function getColor(path: ColorPaths, mode: ThemeMode = 'light'): string {
   const themeColors = theme[mode].colors;
   const keys = path.split('.') as (keyof typeof themeColors)[];
-  let value: any = themeColors;
+  let value: Record<string, unknown> = themeColors as Record<string, unknown>;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {
-      value = value[key];
+      value = (value as Record<string, unknown>)[key] as Record<string, unknown>;
     } else {
       console.warn(`Color path "${path}" not found in ${mode} theme, falling back to light theme`);
       return getColor(path, 'light');
     }
   }
   
-  return value;
+  return typeof value === 'string' ? value : getColor(path, 'light');
 }
 
 /**
@@ -31,18 +31,18 @@ export function getColor(path: ColorPaths, mode: ThemeMode = 'light'): string {
 export function getGradient(path: GradientPaths, mode: ThemeMode = 'light'): string {
   const themeGradients = theme[mode].gradients;
   const keys = path.split('.') as (keyof typeof themeGradients)[];
-  let value: any = themeGradients;
+  let value: Record<string, unknown> = themeGradients as Record<string, unknown>;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {
-      value = value[key];
+      value = (value as Record<string, unknown>)[key] as Record<string, unknown>;
     } else {
       console.warn(`Gradient path "${path}" not found in ${mode} theme, falling back to light theme`);
       return getGradient(path, 'light');
     }
   }
   
-  return value;
+  return typeof value === 'string' ? value : getGradient(path, 'light');
 }
 
 /**

@@ -41,7 +41,7 @@ export class PerformanceMonitor {
     // Memory monitoring
     if ('memory' in performance) {
       setInterval(() => {
-        const memory = (performance as any).memory;
+        const memory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
         this.metrics.memoryUsage = {
           used: memory.usedJSHeapSize,
           total: memory.totalJSHeapSize,
@@ -52,14 +52,14 @@ export class PerformanceMonitor {
     }
 
     // Global error handling for type errors
-    window.addEventListener('error', (event) => {
+    globalThis.addEventListener('error', (event) => {
       if (event.error && event.error.name === 'TypeError') {
         this.recordTypeError(event.error.message);
       }
     });
 
     // Unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
+    globalThis.addEventListener('unhandledrejection', (event) => {
       this.recordTypeError(`Unhandled promise rejection: ${event.reason}`);
     });
   }
@@ -155,12 +155,12 @@ export class PerformanceMonitor {
       typeErrors: this.metrics.typeErrors.length,
       recentTypeErrors: this.metrics.typeErrors.slice(-5),
       componentPerformance: Array.from(this.metrics.componentRenderTimes.entries())
-        .map(([name, times]) => ({
+        .map(([name, _times]) => ({
           component: name,
           ...this.getComponentStats(name)
         })),
       cachePerformance: Array.from(this.metrics.cacheHitRates.entries())
-        .map(([name, stats]) => ({
+        .map(([name, _stats]) => ({
           cache: name,
           ...this.getCacheStats(name)
         }))

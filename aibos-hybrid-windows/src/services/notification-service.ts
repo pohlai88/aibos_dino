@@ -376,7 +376,7 @@ export class EnterpriseNotificationService extends EventEmitter {
     return true;
   }
   
-  private shouldSend(notification: Notification, channels: NotificationChannel[]): boolean {
+  private shouldSend(notification: Notification, _channels: NotificationChannel[]): boolean {
     // Check Do Not Disturb
     if (this.preferences.doNotDisturb) {
       return notification.priority === 'critical';

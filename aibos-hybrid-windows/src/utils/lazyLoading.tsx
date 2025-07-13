@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, ComponentType } from 'react';
 
 // Lazy loading wrapper with error boundary
-export function createLazyComponent<T extends ComponentType<any>>(
+export function createLazyComponent<T extends ComponentType<Record<string, unknown>>>(
   importFunc: () => Promise<{ default: T }>,
   fallback?: React.ReactNode
 ) {
@@ -16,10 +16,10 @@ export function createLazyComponent<T extends ComponentType<any>>(
 
 // Component registry for caching
 class ComponentRegistry {
-  private cache = new Map<string, ComponentType<any>>();
-  private loading = new Map<string, Promise<ComponentType<any>>>();
+  private cache = new Map<string, ComponentType<Record<string, unknown>>>();
+  private loading = new Map<string, Promise<ComponentType<Record<string, unknown>>>>();
 
-  async loadComponent<T extends ComponentType<any>>(
+  async loadComponent<T extends ComponentType<Record<string, unknown>>>(
     key: string,
     importFunc: () => Promise<{ default: T }>
   ): Promise<T> {
@@ -50,7 +50,7 @@ class ComponentRegistry {
     return loadPromise;
   }
 
-  preloadComponent<T extends ComponentType<any>>(
+  preloadComponent<T extends ComponentType<Record<string, unknown>>>(
     key: string,
     importFunc: () => Promise<{ default: T }>
   ) {
@@ -68,7 +68,7 @@ class ComponentRegistry {
 export const componentRegistry = new ComponentRegistry();
 
 // Lazy loading with registry
-export function createLazyComponentWithRegistry<T extends ComponentType<any>>(
+export function createLazyComponentWithRegistry<T extends ComponentType<Record<string, unknown>>>(
   key: string,
   importFunc: () => Promise<{ default: T }>,
   fallback?: React.ReactNode

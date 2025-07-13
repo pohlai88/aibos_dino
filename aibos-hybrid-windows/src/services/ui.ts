@@ -2,7 +2,7 @@ import { EnterpriseLogger } from './core/logger';
 
 export class UIService {
   private logger: EnterpriseLogger;
-  private contextMenuBatch: Record<string, any> = {};
+  private contextMenuBatch: Record<string, unknown> = {};
   private contextMenuBatchTimer?: number;
 
   constructor() {
@@ -16,14 +16,14 @@ export class UIService {
     });
   }
 
-  registerContextMenu(id: string, config: any): void {
+  registerContextMenu(id: string, config: Record<string, unknown>): void {
     this.contextMenuBatch[id] = config;
     
     if (this.contextMenuBatchTimer) {
       clearTimeout(this.contextMenuBatchTimer);
     }
     
-    this.contextMenuBatchTimer = window.setTimeout(() => {
+          this.contextMenuBatchTimer = globalThis.setTimeout(() => {
       this.flushContextMenuBatch();
     }, 100);
   }

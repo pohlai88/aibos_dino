@@ -261,9 +261,9 @@ export async function moveFile(
 /**
  * Read a JSON file
  * @param filePath - Path to the JSON file
- * @returns Promise<any> - Parsed JSON content
+ * @returns Promise<unknown> - Parsed JSON content
  */
-export async function readJsonFile(filePath: string): Promise<any> {
+export async function readJsonFile(filePath: string): Promise<unknown> {
   try {
     const content = await Deno.readTextFile(filePath);
     return JSON.parse(content);
@@ -283,7 +283,7 @@ export async function readJsonFile(filePath: string): Promise<any> {
  */
 export async function writeJsonFile(
   filePath: string, 
-  data: any, 
+  data: unknown, 
   options: {
     pretty?: boolean;
     dryRun?: boolean;

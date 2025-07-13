@@ -67,7 +67,7 @@ export const GridLayoutManager: React.FC<GridLayoutManagerProps> = ({ isVisible,
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 

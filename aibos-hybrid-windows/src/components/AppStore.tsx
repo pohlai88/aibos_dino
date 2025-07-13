@@ -40,7 +40,7 @@ const AppStore: React.FC<AppStoreProps> = ({
 
   // Performance: Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    typeof window !== 'undefined' && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches, 
     []
   );
 
@@ -375,6 +375,7 @@ const AppStore: React.FC<AppStoreProps> = ({
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setError(null)}
             className="ml-auto text-sm hover:underline"
             style={{ color: getColor('error.600', colorMode) }}
@@ -478,6 +479,7 @@ const AppStore: React.FC<AppStoreProps> = ({
                     <div className="flex gap-2">
                       {installation && (
                         <button
+                          type="button"
                           onClick={() => uninstallApp(installation)}
                           style={themeStyles.button.danger}
                           className="px-3 py-1 text-sm rounded-md hover:bg-opacity-80 transition-colors"
@@ -487,6 +489,7 @@ const AppStore: React.FC<AppStoreProps> = ({
                         </button>
                       )}
                       <button
+                        type="button"
                         onClick={() => onAppOpen?.(app)}
                         style={themeStyles.button.secondary}
                         className="px-3 py-1 text-sm rounded-md hover:bg-opacity-80 transition-colors"
@@ -497,6 +500,7 @@ const AppStore: React.FC<AppStoreProps> = ({
                     </div>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => installApp(app)}
                       disabled={isInstalling}
                       style={isInstalling ? themeStyles.button.secondary : themeStyles.button.primary}
@@ -604,6 +608,7 @@ const AppStore: React.FC<AppStoreProps> = ({
                           Status: {installation.status}
                         </span>
                         <button
+                          type="button"
                           onClick={() => uninstallApp(installation)}
                           style={themeStyles.button.danger}
                           className="px-3 py-1 text-sm rounded-md hover:bg-opacity-80 transition-colors"

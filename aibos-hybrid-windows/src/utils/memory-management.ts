@@ -23,7 +23,7 @@ export class MemoryTrackerImpl implements MemoryTracker {
     
     // Auto-cleanup on page unload
     if (typeof window !== 'undefined') {
-      window.addEventListener('beforeunload', () => this.cleanup());
+      globalThis.addEventListener('beforeunload', () => this.cleanup());
     }
     
     return resource;
@@ -47,7 +47,7 @@ export class MemoryTrackerImpl implements MemoryTracker {
 
 // React hook for automatic cleanup
 export function useMemoryCleanup() {
-  const tracker = MemoryTrackerImpl.getInstance();
+  const _tracker = MemoryTrackerImpl.getInstance();
   const cleanupFunctions = React.useRef<CleanupFunction[]>([]);
 
   const addCleanup = React.useCallback((cleanup: CleanupFunction) => {

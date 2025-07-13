@@ -1,9 +1,8 @@
 import { supabase } from '../../modules/supabase-client.ts';
-// REMOVED: import { logInfo, logWarn, logError } from '../../modules/logging.ts';
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 interface QueryCache {
-  data: any;
+  data: unknown;
   timestamp: number;
   ttl: number;
 }
@@ -14,17 +13,13 @@ class QueryOptimizer {
   private readonly FAST_TTL = 1000;
   private logger = new EnterpriseLogger();
   
-  async getTenantsOptimized(page = 0, limit = 20): Promise<any> {
+  async getTenantsOptimized(page = 0, limit = 20): Promise<Record<string, unknown>> {
     const cacheKey = `tenants_${page}_${limit}`;
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
     
     const startTime = performance.now();
     
-    // Replace all logging calls:
-    // logInfo('message') → this.logger.info('message', { component: 'QueryOptimizer', action: 'getTenantsOptimized' })
-    // logWarn('message') → this.logger.warn('message', { component: 'QueryOptimizer', action: 'getTenantsOptimized' })
-    // logError('message') → this.logger.error('message', { component: 'QueryOptimizer', action: 'getTenantsOptimized' })
     const { data, error } = await supabase
       .from('tenants')
       .select(`
@@ -36,7 +31,7 @@ class QueryOptimizer {
       .range(page * limit, (page + 1) * limit - 1);
     
     const duration = performance.now() - startTime;
-    logInfo(`[Query] Tenants: ${duration.toFixed(2)}ms`);
+    this.logger.info(`[Query] Tenants: ${duration.toFixed(2)}ms`, { component: 'QueryOptimizer', action: 'getTenantsOptimized', metadata: { duration: duration.toFixed(2) } });
     
     if (error) throw error;
     
@@ -45,7 +40,7 @@ class QueryOptimizer {
   }
   
   // Optimized notes queries with intelligent caching
-  async getNotesOptimized(tenantId: string, limit = 50): Promise<any> {
+  async getNotesOptimized(tenantId: string, limit = 50): Promise<Record<string, unknown>> {
     const cacheKey = `notes_${tenantId}_${limit}`;
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
@@ -61,7 +56,7 @@ class QueryOptimizer {
       .limit(limit);
     
     const duration = performance.now() - startTime;
-    logInfo(`[Query] Notes: ${duration.toFixed(2)}ms`);
+    this.logger.info(`[Query] Notes: ${duration.toFixed(2)}ms`, { component: 'QueryOptimizer', action: 'getNotesOptimized', metadata: { duration: duration.toFixed(2) } });
     
     if (error) throw error;
     
@@ -70,7 +65,7 @@ class QueryOptimizer {
   }
   
   // Optimized RPC calls with result caching
-  async getTenantMetricsOptimized(tenantId: string): Promise<any> {
+  async getTenantMetricsOptimized(tenantId: string): Promise<Record<string, unknown>> {
     const cacheKey = `metrics_${tenantId}`;
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
@@ -84,7 +79,7 @@ class QueryOptimizer {
       });
     
     const duration = performance.now() - startTime;
-    logInfo(`[RPC] Tenant Metrics: ${duration.toFixed(2)}ms`);
+    this.logger.info(`[RPC] Tenant Metrics: ${duration.toFixed(2)}ms`, { component: 'QueryOptimizer', action: 'getTenantMetricsOptimized', metadata: { duration: duration.toFixed(2) } });
     
     if (error) throw error;
     
@@ -93,7 +88,7 @@ class QueryOptimizer {
   }
   
   // Cache management
-  private getFromCache(key: string): any | null {
+  private getFromCache(key: string): unknown | null {
     const entry = this.cache.get(key);
     if (entry && Date.now() - entry.timestamp < entry.ttl) {
       return entry.data;
@@ -102,7 +97,7 @@ class QueryOptimizer {
     return null;
   }
   
-  private setCache(key: string, data: any, ttl: number): void {
+  private setCache(key: string, data: unknown, ttl: number): void {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),

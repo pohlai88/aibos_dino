@@ -494,7 +494,7 @@ export const designTokens = {
  */
 export function getColor(path: ColorPaths): string {
   const keys = path.split('.');
-  let value: any = colors;
+  let value: Record<string, unknown> = colors as Record<string, unknown>;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {
@@ -512,7 +512,7 @@ export function getColor(path: ColorPaths): string {
  */
 export function getGradient(path: GradientPaths): string {
   const keys = path.split('.');
-  let value: any = gradients;
+  let value: Record<string, unknown> = gradients as Record<string, unknown>;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {

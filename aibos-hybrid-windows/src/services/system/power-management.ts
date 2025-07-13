@@ -5,7 +5,7 @@ import { EventThrottler } from '../core/event-throttler';
 export class PowerManagementService {
   private logger: Logger;
   private throttler: EventThrottler;
-  private battery?: any;
+  private battery?: BatteryManager | null;
   private isInitialized = false;
 
   constructor(logger: Logger, throttler: EventThrottler) {

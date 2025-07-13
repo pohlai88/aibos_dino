@@ -181,7 +181,7 @@ export function getTheme(mode: ThemeMode) {
 export function getThemeColor(mode: ThemeMode, path: string): string {
   const themeColors = theme[mode].colors;
   const keys = path.split('.');
-  let value: any = themeColors;
+  let value: Record<string, unknown> = themeColors as Record<string, unknown>;
   
   for (const key of keys) {
     if (value && typeof value === 'object' && key in value) {

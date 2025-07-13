@@ -1,20 +1,46 @@
-import { SearchProvider, SearchResult } from '../types/search.ts';
-import { systemIntegration } from './systemIntegration.ts';
-import { createSearchResult } from './searchRegistry.ts';
-import { EnterpriseLogger } from './core/logger';
+import { SearchProvider as _SearchProvider, SearchResult as _SearchResult } from '../types/search.ts';
+import { createSearchResult as _createSearchResult } from './searchRegistry.ts';
+import { EnterpriseLogger } from './core/logger.ts';
+import { useUIState } from '../store/uiState.ts';
 
-class SystemCommandsProvider implements SearchProvider {
-  private logger = new EnterpriseLogger();
-  
-  // Replace all logging calls:
-  // logInfo() → this.logger.info('message', { component: 'SystemCommands', action: 'actionName' })
-  // logWarn() → this.logger.warn('message', { component: 'SystemCommands', action: 'actionName' })
-  // logError() → this.logger.error('message', { component: 'SystemCommands', action: 'actionName' })
-  
-  // ... existing code ...
+// Type definitions
+export type SystemCommandCategory = 'navigation' | 'system' | 'user' | 'help' | 'performance' | 'utilities';
+export type SystemCommandStatus = 'available' | 'disabled' | 'loading' | 'error' | 'maintenance';
+export type SystemCommandPermission = 'basic' | 'admin' | 'system';
+
+export interface SystemCommandMetadata {
+  version: string;
+  author: string;
+  lastUpdated: Date;
+  usageCount: number;
+  tags: string[];
+  isSystem: boolean;
+  isHidden: boolean;
 }
 
-// Get command statistics
+export interface SystemCommand {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  shortcut?: string;
+  action: () => void | Promise<void>;
+  category: SystemCommandCategory;
+  status: SystemCommandStatus;
+  metadata: SystemCommandMetadata;
+  permissions: SystemCommandPermission[];
+  keywords: string[];
+  helpText: string;
+  examples: string[];
+}
+
+class SystemCommandsService {
+  private logger = new EnterpriseLogger();
+  private commands = new Map<string, SystemCommand>();
+  private categories: SystemCommandCategory[] = ['navigation', 'system', 'user', 'help', 'performance', 'utilities'];
+  private permissions: SystemCommandPermission[] = ['basic', 'admin', 'system'];
+
+  // Get command statistics
   getStats(): {
     total: number;
     byCategory: Record<SystemCommandCategory, number>;
@@ -55,6 +81,48 @@ class SystemCommandsProvider implements SearchProvider {
       hiddenCommands: commands.filter(cmd => cmd.metadata.isHidden).length,
       recentlyUsed: commands.filter(cmd => cmd.metadata.lastUpdated > weekAgo).length
     };
+  }
+
+  // Get all categories
+  getCategories(): SystemCommandCategory[] {
+    return this.categories;
+  }
+
+  // Get all permissions
+  getPermissions(): SystemCommandPermission[] {
+    return this.permissions;
+  }
+
+  // Get all commands
+  getAll(options: { includeHidden?: boolean } = {}): SystemCommand[] {
+    const commands = Array.from(this.commands.values());
+    if (!options.includeHidden) {
+      return commands.filter(cmd => !cmd.metadata.isHidden);
+    }
+    return commands;
+  }
+
+  // Register a command
+  register(command: SystemCommand): void {
+    this.commands.set(command.id, command);
+  }
+
+  // Execute a command
+  async execute(id: string, _options?: Record<string, unknown>): Promise<boolean> {
+    const command = this.commands.get(id);
+    if (!command) {
+      this.logger.error(`Command not found: ${id}`, { component: 'SystemCommands', action: 'execute', metadata: { commandId: id } });
+      return false;
+    }
+
+    try {
+      await command.action();
+      this.logger.info(`Command executed: ${command.title}`, { component: 'SystemCommands', action: 'execute', metadata: { commandId: id } });
+      return true;
+    } catch (error) {
+      this.logger.error(`Command execution failed: ${command.title}`, { component: 'SystemCommands', action: 'execute', metadata: { commandId: id, error: error instanceof Error ? error.message : String(error) } });
+      return false;
+    }
   }
 
   // Initialize default system commands
@@ -190,12 +258,12 @@ class SystemCommandsProvider implements SearchProvider {
         icon: 'ℹ️',
         shortcut: 'Ctrl+I',
         action: async () => {
-          logInfo('System Information:');
-          logInfo('- OS: AI-BOS Hybrid Windows');
-          logInfo('- Version: 1.0.0');
-          logInfo('- Architecture: Web-based');
-          logInfo('- Memory: Available');
-          logInfo('- Storage: Available');
+          this.logger.info('System Information:', { component: 'SystemCommands', action: 'systemInfo' });
+          this.logger.info('- OS: AI-BOS Hybrid Windows');
+          this.logger.info('- Version: 1.0.0');
+          this.logger.info('- Architecture: Web-based');
+          this.logger.info('- Memory: Available');
+          this.logger.info('- Storage: Available');
         },
         category: 'system',
         status: 'available',
@@ -220,11 +288,11 @@ class SystemCommandsProvider implements SearchProvider {
         icon: '📊',
         shortcut: 'Ctrl+P',
         action: async () => {
-          logInfo('Performance Monitor:');
-          logInfo('- CPU Usage: 45%');
-          logInfo('- Memory Usage: 62%');
-          logInfo('- Network: Online');
-          logInfo('- Battery: 87%');
+          this.logger.info('Performance Monitor:', { component: 'SystemCommands', action: 'performanceMonitor' });
+          this.logger.info('- CPU Usage: 45%');
+          this.logger.info('- Memory Usage: 62%');
+          this.logger.info('- Network: Online');
+          this.logger.info('- Battery: 87%');
         },
         category: 'performance',
         status: 'available',
@@ -249,8 +317,8 @@ class SystemCommandsProvider implements SearchProvider {
         icon: '🖥️',
         shortcut: 'Ctrl+M',
         action: () => {
-          if (typeof window !== 'undefined' && (window as any).openMultiMonitorLayout) {
-            (window as any).openMultiMonitorLayout();
+          if (typeof globalThis !== 'undefined' && (globalThis as typeof globalThis & { openMultiMonitorLayout?: () => void }).openMultiMonitorLayout) {
+            (globalThis as typeof globalThis & { openMultiMonitorLayout?: () => void }).openMultiMonitorLayout?.();
           }
         },
         category: 'system',

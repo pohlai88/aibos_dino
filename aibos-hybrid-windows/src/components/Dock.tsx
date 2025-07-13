@@ -57,7 +57,7 @@ export const Dock = memo(() => {
   
   // Accessibility: Check for reduced motion preference
   const prefersReducedMotion = typeof window !== 'undefined' 
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches 
+    ? globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches 
     : false;
 
   // Auto-hide dock after inactivity with performance optimization

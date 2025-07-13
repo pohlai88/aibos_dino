@@ -1,8 +1,7 @@
 import { useUIState } from '../store/uiState.ts';
 import { SearchProvider } from '../types/search.ts';
 import { createCommandSearchResult } from './searchRegistry.ts';
-// REMOVED: import { logInfo, logWarn } from '../../modules/logging.ts';
-import { EnterpriseLogger } from './core/logger';
+import { EnterpriseLogger } from './core/logger.ts';
 
 export interface ShortcutDefinition {
   id: string;
@@ -44,11 +43,12 @@ class ShortcutManager {
   private keyMap: Map<string, ShortcutDefinition[]> = new Map(); // For quick key lookup
   private conflicts: ShortcutConflict[] = [];
   private searchProvider?: SearchProvider;
+  private logger = new EnterpriseLogger();
 
   // Register a new shortcut with conflict detection
   register(shortcut: ShortcutDefinition): void {
     if (this.shortcuts.has(shortcut.id)) {
-      logWarn(`Shortcut ${shortcut.id} already registered, overwriting...`);
+      this.logger.warn(`Shortcut ${shortcut.id} already registered, overwriting...`, { component: 'ShortcutManager', action: 'registerShortcut', metadata: { shortcutId: shortcut.id } });
     }
     
     const normalizedShortcut: ShortcutDefinition = {
@@ -71,7 +71,7 @@ class ShortcutManager {
     if (!shortcut) return false;
     
     if (shortcut.isSystem) {
-      logWarn(`Cannot unregister system shortcut: ${shortcutId}`);
+      this.logger.warn(`Cannot unregister system shortcut: ${shortcutId}`, { component: 'ShortcutManager', action: 'unregisterShortcut', metadata: { shortcutId } });
       return false;
     }
 
@@ -192,7 +192,7 @@ class ShortcutManager {
           
           if (!exists) {
             this.conflicts.push(conflict);
-            logWarn(`Shortcut conflict detected: ${shortcut.key}`);
+            this.logger.warn(`Shortcut conflict detected: ${shortcut.key}`, { component: 'ShortcutManager', action: 'detectConflict', metadata: { shortcutId: shortcut.id } });
           }
         }
       });
@@ -460,7 +460,7 @@ class ShortcutManager {
       tags: ['close', 'window', 'exit'],
       action: () => {
         // This would need to be implemented based on your window management system
-        logInfo('Close active window');
+        this.logger.info('Close active window', { component: 'ShortcutManager', action: 'windowClose' });
       },
       context: 'global',
       priority: 60,
@@ -475,7 +475,7 @@ class ShortcutManager {
       icon: '➖',
       tags: ['minimize', 'window', 'hide'],
       action: () => {
-        logInfo('Minimize active window');
+        this.logger.info('Minimize active window', { component: 'ShortcutManager', action: 'windowMinimize' });
       },
       context: 'global',
       priority: 60,
@@ -530,9 +530,9 @@ class ShortcutManager {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
     this.eventListeners.set('keydown', () => {
-      window.removeEventListener('keydown', handleKeyDown);
+              globalThis.removeEventListener('keydown', handleKeyDown);
     });
   }
 
@@ -670,11 +670,11 @@ export const useShortcutManager = () => {
     getStats: shortcutManager.getStats.bind(shortcutManager)
   };
 };
-import { SearchProvider, SearchResult } from '../types/search.ts';
-import { createSearchResult } from './searchRegistry.ts';
-import { EnterpriseLogger } from './core/logger';
+import { SearchProvider, SearchResult as _SearchResult } from '../types/search.ts';
+import { createSearchResult as _createSearchResult } from './searchRegistry.ts';
+import { EnterpriseLogger } from './core/logger.ts';
 
-class ShortcutManagerProvider implements SearchProvider {
+class _ShortcutManagerProvider implements SearchProvider {
   private logger = new EnterpriseLogger();
   
   // Replace all logging calls:

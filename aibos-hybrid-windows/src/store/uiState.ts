@@ -52,7 +52,7 @@ interface UIState {
   highContrastMode: boolean;
   // Spotlight/search
   lastSpotlightQuery?: string;
-  lastSpotlightResults?: any[];
+  lastSpotlightResults?: unknown[];
   // Notifications
   notifications: Notification[];
   // --- Actions ---
@@ -95,7 +95,7 @@ interface UIState {
   toggleHighContrast: () => void;
   // Spotlight/search
   setLastSpotlightQuery: (query: string) => void;
-  setLastSpotlightResults: (results: any[]) => void;
+  setLastSpotlightResults: (results: unknown[]) => void;
   // Notifications
   addNotification: (type: Notification['type'], message: string) => void;
   removeNotification: (id: string) => void;
