@@ -1,7 +1,10 @@
 import React from 'react';
-import { SearchProvider } from '../types/search.ts';
+// REMOVED: import { logInfo, logWarn, logError, logSuccess } from '../../modules/logging.ts';
 import { createAppSearchResult } from './searchRegistry.ts';
 import { useUIState } from '../store/uiState.ts';
+import { SearchProvider, SearchResult } from '../types/search.ts';
+import { monitorManager } from './monitorManager.ts';
+import { EnterpriseLogger } from './core/logger';
 
 // App categories for better organization
 export type AppCategory = 
@@ -82,6 +85,16 @@ export interface AppLaunchOptions {
   permissions?: AppPermission[];
 }
 
+// Search provider interface
+export interface SearchProvider {
+  id: string;
+  name: string;
+  description: string;
+  priority: number;
+  search: (query: string, limit?: number) => Promise<SearchResult[]>;
+  getQuickAccess: (limit?: number) => Promise<SearchResult[]>;
+}
+
 // App registry service with enhanced functionality
 class AppRegistryService {
   private apps = new Map<string, AppInfo>();
@@ -129,7 +142,7 @@ class AppRegistryService {
 
     // Check for duplicate IDs
     if (this.apps.has(app.id)) {
-      console.warn(`App with ID '${app.id}' already exists. Overwriting...`);
+      logWarn(`App with ID '${app.id}' already exists. Overwriting...`);
     }
 
     // Set default values
@@ -168,6 +181,7 @@ class AppRegistryService {
 
     this.apps.set(app.id, appWithDefaults);
     this.emitEvent('appRegistered', appWithDefaults);
+    logSuccess(`App registered: ${app.title} (${app.id})`);
   }
 
   // Unregister an app
@@ -176,6 +190,7 @@ class AppRegistryService {
     if (app) {
       this.apps.delete(id);
       this.emitEvent('appUnregistered', app);
+      logInfo(`App unregistered: ${app.title} (${id})`);
       return true;
     }
     return false;
@@ -247,7 +262,7 @@ class AppRegistryService {
     includeSystem?: boolean;
   }): AppInfo[] {
     const queryLower = query.toLowerCase();
-    let apps = this.getAll(options);
+    const apps = this.getAll(options);
 
     return apps.filter(app => 
       app.title.toLowerCase().includes(queryLower) ||
@@ -263,7 +278,7 @@ class AppRegistryService {
   launch(id: string, options?: AppLaunchOptions): boolean {
     const app = this.get(id);
     if (!app) {
-      console.error(`App '${id}' not found`);
+      logError(`App '${id}' not found`);
       return false;
     }
 
@@ -275,10 +290,20 @@ class AppRegistryService {
       app.metadata.lastUpdated = new Date();
       app.status = 'active';
 
+      // Get monitor-aware positioning
+      const primaryMonitor = monitorManager.getPrimaryMonitor();
+      const defaultPosition = app.defaultWindowPosition || { x: 100, y: 100 };
+      
+      // Adjust position to be relative to primary monitor
+      const monitorAwarePosition = {
+        x: primaryMonitor.bounds.x + defaultPosition.x,
+        y: primaryMonitor.bounds.y + defaultPosition.y
+      };
+      
       // Prepare window options
       const windowOptions = {
         size: options?.windowOptions?.size || app.defaultWindowSize,
-        position: options?.windowOptions?.position || app.defaultWindowPosition,
+        position: options?.windowOptions?.position || monitorAwarePosition,
         ...options?.windowOptions
       };
 
@@ -289,9 +314,10 @@ class AppRegistryService {
       });
 
       this.emitEvent('appLaunched', app);
+      logSuccess(`App launched: ${app.title} (${id})`);
       return true;
     } catch (error) {
-      console.error(`Failed to launch app '${id}':`, error);
+      logError(`Failed to launch app '${id}': ${error instanceof Error ? error.message : String(error)}`);
       app.status = 'error';
       this.emitEvent('appLaunchFailed', app);
       return false;
@@ -304,6 +330,7 @@ class AppRegistryService {
     if (app) {
       app.status = status;
       this.emitEvent('appStatusChanged', app);
+      logInfo(`App status updated: ${app.title} (${id}) -> ${status}`);
       return true;
     }
     return false;
@@ -315,6 +342,7 @@ class AppRegistryService {
     if (app) {
       app.metadata = { ...app.metadata, ...metadata };
       this.emitEvent('appMetadataUpdated', app);
+      logInfo(`App metadata updated: ${app.title} (${id})`);
       return true;
     }
     return false;
@@ -369,43 +397,43 @@ class AppRegistryService {
       name: 'Applications',
       description: 'Search and launch applications',
       priority: 5,
-      search: async (query: string, limit?: number) => {
+      search: (query: string, limit?: number) => {
         const queryLower = query.toLowerCase();
-        return this.getAll()
-          .filter(app => 
-            app.title.toLowerCase().includes(queryLower) ||
-            app.description.toLowerCase().includes(queryLower) ||
-            app.category.toLowerCase().includes(queryLower) ||
-            app.metadata.tags.some(tag => tag.toLowerCase().includes(queryLower)) ||
-            app.keywords?.some(keyword => keyword.toLowerCase().includes(queryLower))
-          )
-          .slice(0, limit || 10)
-          .map(app => createAppSearchResult(
+        return Promise.resolve(
+          this.getAll()
+            .filter(app => 
+              app.title.toLowerCase().includes(queryLower) ||
+              app.description.toLowerCase().includes(queryLower) ||
+              app.category.toLowerCase().includes(queryLower) ||
+              app.metadata.tags.some(tag => tag.toLowerCase().includes(queryLower)) ||
+              app.keywords?.some(keyword => keyword.toLowerCase().includes(queryLower))
+            )
+            .slice(0, limit || 10)
+            .map(app => createAppSearchResult(
+              app.id,
+              app.title,
+              app.icon,
+              `${app.description} (${this.getCategoryName(app.category)})`,
+              app.category,
+              () => { this.launch(app.id); }
+            ))
+        );
+      },
+      getQuickAccess: (limit?: number) => {
+        const recentlyUsed = this.getRecentlyUsed(Math.ceil((limit || 8) / 2));
+        const popular = this.getPopular(Math.ceil((limit || 8) / 2));
+        const combined = [...recentlyUsed, ...popular];
+        const unique = Array.from(new Map(combined.map(app => [app.id, app])).values());
+        return Promise.resolve(
+          unique.slice(0, limit || 8).map(app => createAppSearchResult(
             app.id,
             app.title,
             app.icon,
             `${app.description} (${this.getCategoryName(app.category)})`,
             app.category,
             () => { this.launch(app.id); }
-          ));
-      },
-      getQuickAccess: async (limit?: number) => {
-        // Get recently used and popular apps for quick access
-        const recentlyUsed = this.getRecentlyUsed(Math.ceil((limit || 8) / 2));
-        const popular = this.getPopular(Math.ceil((limit || 8) / 2));
-        
-        // Combine and deduplicate
-        const combined = [...recentlyUsed, ...popular];
-        const unique = Array.from(new Map(combined.map(app => [app.id, app])).values());
-        
-        return unique.slice(0, limit || 8).map(app => createAppSearchResult(
-          app.id,
-          app.title,
-          app.icon,
-          `${app.description} (${this.getCategoryName(app.category)})`,
-          app.category,
-          () => { this.launch(app.id); }
-        ));
+          ))
+        );
       }
     };
   }
@@ -471,4 +499,14 @@ export const launchApp = (id: string, options?: AppLaunchOptions): boolean => {
 // Utility function to search apps
 export const searchApps = (query: string, options?: Parameters<typeof appRegistry.search>[1]): AppInfo[] => {
   return appRegistry.search(query, options);
-}; 
+};
+
+class AppRegistryProvider implements SearchProvider {
+  private logger = new EnterpriseLogger();
+  
+  // Replace all logging calls:
+  // logInfo('message') → this.logger.info('message', { component: 'AppRegistry', action: 'actionName' })
+  // logWarn('message') → this.logger.warn('message', { component: 'AppRegistry', action: 'actionName' })
+  // logError('message') → this.logger.error('message', { component: 'AppRegistry', action: 'actionName' })
+  // logSuccess('message') → this.logger.info('message', { component: 'AppRegistry', action: 'actionName', metadata: { status: 'success' } })
+}

@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+// REMOVED: import { logError } from '../../modules/logging.ts';
+import { EnterpriseLogger } from './core/logger';
 
 // Types for file system operations
 export interface FileSystemItem {
@@ -530,7 +532,7 @@ export class FileSystemService {
           performed_by: user.id
         });
     } catch (error) {
-      console.error('Failed to log operation:', error);
+      logError(`Failed to log operation: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -567,4 +569,11 @@ export class FileSystemService {
 }
 
 // Export singleton instance
-export const fileSystemService = new FileSystemService(); 
+export const fileSystemService = new FileSystemService();
+
+class SupabaseService {
+  private logger = new EnterpriseLogger();
+  
+  // Replace all logging calls:
+  // logError('message') → this.logger.error('message', { component: 'SupabaseService', action: 'actionName' })
+}

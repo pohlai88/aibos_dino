@@ -1,13 +1,8 @@
 #!/usr/bin/env -S deno run --allow-net --allow-read --allow-write --allow-env
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import * as colors from "https://deno.land/std@0.220.1/fmt/colors.ts";
-import { SUPABASE_CONFIG } from "../config.ts";
-
-const supabase = createClient(
-  SUPABASE_CONFIG.url,
-  SUPABASE_CONFIG.serviceRoleKey
-);
+import { supabase } from '../modules/supabase-client.ts';
+import { writeTextFile } from '../modules/filesystem.ts';
+import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
 
 interface ScaffoldConfig {
   appsRoot: string;
@@ -15,23 +10,11 @@ interface ScaffoldConfig {
 }
 
 async function promptInput(message: string, required = true): Promise<string> {
-  let value = "";
+  let value = '';
   do {
-    value = prompt(colors.cyan(`${message} `)) || "";
+    value = prompt(`${message} `) || '';
   } while (required && !value.trim());
   return value.trim();
-}
-
-function logSuccess(message: string) {
-  console.log(colors.green(`✅ ${message}`));
-}
-
-function logError(message: string) {
-  console.error(colors.red(`❌ ${message}`));
-}
-
-function logWarn(message: string) {
-  console.warn(colors.yellow(`⚠️ ${message}`));
 }
 
 async function exitWithError(message: string) {
@@ -43,27 +26,27 @@ async function main() {
   const start = Date.now();
 
   const config: ScaffoldConfig = {
-    appsRoot: "apps",
-    dryRun: Deno.args.includes("--dry-run")
+    appsRoot: 'apps',
+    dryRun: Deno.args.includes('--dry-run')
   };
 
-  console.log(colors.bold(colors.cyan("🚀 AIBOS App Integration Generator\n")));
+  logInfo('🚀 AIBOS App Integration Generator');
 
   // Gather app details
-  const name = await promptInput("App Name:");
-  const slug = await promptInput("App Slug (unique, lowercase, hyphens):");
-  const description = await promptInput("Short Description:");
-  const categorySlug = await promptInput("Category slug (e.g. productivity, utilities):");
-  const authorEmail = await promptInput("Author Email (optional):", false);
+  const name = await promptInput('App Name:');
+  const slug = await promptInput('App Slug (unique, lowercase, hyphens):');
+  const description = await promptInput('Short Description:');
+  const categorySlug = await promptInput('Category slug (e.g. productivity, utilities):');
+  const authorEmail = await promptInput('Author Email (optional):', false);
 
   // Check for duplicate slugs
   const { data: existing, error: slugError } = await supabase
-    .from("apps")
-    .select("id")
-    .eq("slug", slug)
+    .from('apps')
+    .select('id')
+    .eq('slug', slug)
     .single();
 
-  if (slugError && slugError.code !== "PGRST116") {
+  if (slugError && slugError.code !== 'PGRST116') {
     await exitWithError(`Supabase error checking slug: ${slugError.message}`);
   }
 
@@ -73,9 +56,9 @@ async function main() {
 
   // Find category
   const { data: category, error: categoryError } = await supabase
-    .from("app_categories")
-    .select("id")
-    .eq("slug", categorySlug)
+    .from('app_categories')
+    .select('id')
+    .eq('slug', categorySlug)
     .single();
 
   if (categoryError || !category) {
@@ -86,9 +69,9 @@ async function main() {
   let authorId = null;
   if (authorEmail) {
     const { data: user } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", authorEmail)
+      .from('users')
+      .select('id')
+      .eq('email', authorEmail)
       .single();
 
     if (user) {
@@ -103,14 +86,14 @@ async function main() {
   let app;
   if (!config.dryRun) {
     const { data, error } = await supabase
-      .from("apps")
+      .from('apps')
       .insert({
         name,
         slug,
         description,
         category_id: category.id,
         author_id: authorId,
-        status: "draft",
+        status: 'draft',
         is_free: true,
         is_featured: false,
         is_verified: false
@@ -125,8 +108,8 @@ async function main() {
     app = data;
     logSuccess(`App registered in Supabase: ID ${app.id}`);
   } else {
-    logWarn("Dry-run mode: skipping Supabase insertion.");
-    app = { id: "dry-run-id" };
+    logWarn('Dry-run mode: skipping Supabase insertion.');
+    app = { id: 'dry-run-id' };
   }
 
   const appDir = `${config.appsRoot}/${slug}`;
@@ -138,19 +121,14 @@ async function main() {
 
   // Supabase service file
   const serviceCode = `
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_ANON_KEY")!
-);
+import { supabase } from '../../modules/supabase-client.ts';
 
 export async function getAppData(tenantId: string) {
   const { data, error } = await supabase
-    .from("app_data")
-    .select("*")
-    .eq("app_id", "${app.id}")
-    .eq("tenant_id", tenantId);
+    .from('app_data')
+    .select('*')
+    .eq('app_id', '${app.id}')
+    .eq('tenant_id', tenantId);
   if (error) throw error;
   return data;
 }
@@ -192,17 +170,17 @@ CREATE POLICY "Tenant can access own app data"
 `;
 
   if (!config.dryRun) {
-    await Deno.writeTextFile(`${appDir}/supabase-service.ts`, serviceCode);
-    await Deno.writeTextFile(`${appDir}/index.ts`, `export * from "./supabase-service.ts";`);
-    await Deno.writeTextFile(`${appDir}/types.ts`, typeDefs);
-    await Deno.writeTextFile(`${appDir}/README.md`, readme);
-    logSuccess("Scaffold files written.");
+    await writeTextFile(`${appDir}/supabase-service.ts`, serviceCode);
+    await writeTextFile(`${appDir}/index.ts`, `export * from './supabase-service.ts';`);
+    await writeTextFile(`${appDir}/types.ts`, typeDefs);
+    await writeTextFile(`${appDir}/README.md`, readme);
+    logSuccess('Scaffold files written.');
   } else {
-    logWarn("Dry-run mode: skipping file creation.");
+    logWarn('Dry-run mode: would write scaffold files.');
   }
 
-  const duration = ((Date.now() - start) / 1000).toFixed(2);
-  console.log(colors.bold(colors.green(`\n🎉 App "${name}" scaffolded in ${duration}s.`)));
+  const duration = Date.now() - start;
+  logSuccess(`App integration scaffolded in ${duration}ms`);
 }
 
 if (import.meta.main) {

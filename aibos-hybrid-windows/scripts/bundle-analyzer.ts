@@ -6,9 +6,10 @@
  * Analyzes bundle sizes and provides performance insights.
  */
 
-import { walk } from "https://deno.land/std@0.208.0/fs/mod.ts";
-import { join, extname, relative } from "https://deno.land/std@0.208.0/path/mod.ts";
-import * as colors from "https://deno.land/std@0.208.0/fmt/colors.ts";
+import { walk } from 'https://deno.land/std@0.208.0/fs/mod.ts';
+import { join, extname, relative } from 'https://deno.land/std@0.208.0/path/mod.ts';
+import { writeJsonFile } from '../modules/filesystem.ts';
+import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
 
 interface BundleStats {
   totalSize: number;
@@ -24,7 +25,7 @@ interface BundleStats {
 
 class BundleAnalyzer {
   // Constants
-  private readonly FILE_EXTENSIONS = [".js", ".ts", ".tsx", ".css", ".html", ".json"];
+  private readonly FILE_EXTENSIONS = ['.js', '.ts', '.tsx', '.css', '.html', '.json'];
   private readonly DEFAULT_COMPRESSION_RATIO = 0.7;
   private readonly DEFAULT_CACHE_EFFICIENCY = 0.8;
   private readonly NETWORK_SPEED_3G = 1.5 * 1024 * 1024; // bytes/sec
@@ -45,7 +46,7 @@ class BundleAnalyzer {
   private recommendations: string[] = [];
 
   async analyzeBundle(bundlePath: string): Promise<BundleStats> {
-    this.log(`Starting analysis for bundle: ${bundlePath}`, "info");
+    logInfo(`Starting analysis for bundle: ${bundlePath}`);
 
     try {
       await this.scanDirectory(bundlePath);
@@ -55,7 +56,7 @@ class BundleAnalyzer {
 
       return this.stats;
     } catch (error) {
-      this.log(`Bundle analysis failed: ${error}`, "error");
+      logError(`Bundle analysis failed: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
   }
@@ -92,9 +93,9 @@ class BundleAnalyzer {
       this.stats.largestFiles.sort((a, b) => b.size - a.size);
       this.stats.largestFiles = this.stats.largestFiles.slice(0, 10);
 
-      this.log(`Analyzed: ${filePath}`, "debug");
+      logInfo(`Analyzed: ${filePath}`);
     } catch (error) {
-      this.log(`Could not analyze ${filePath}: ${error}`, "warn");
+      logWarn(`Could not analyze ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -109,63 +110,55 @@ class BundleAnalyzer {
     const compressedSize = totalSize * performanceMetrics.compressionRatio;
 
     if (compressedSize > 1024 * 1024) {
-      this.addRecommendation("Bundle size exceeds 1MB - implement code splitting.");
+      this.addRecommendation('Bundle size exceeds 1MB - implement code splitting.');
     }
     if (fileCount > 50) {
-      this.addRecommendation("Too many small files - consider bundling.");
+      this.addRecommendation('Too many small files - consider bundling.');
     }
     const jsTotalSize =
-      (fileTypes[".js"]?.size || 0) +
-      (fileTypes[".ts"]?.size || 0) +
-      (fileTypes[".tsx"]?.size || 0);
+      (fileTypes['.js']?.size || 0) +
+      (fileTypes['.ts']?.size || 0) +
+      (fileTypes['.tsx']?.size || 0);
     if (jsTotalSize > totalSize * 0.8) {
-      this.addRecommendation("JavaScript dominates bundle. Consider splitting vendor and app code.");
+      this.addRecommendation('JavaScript dominates bundle. Consider splitting vendor and app code.');
     }
     if (performanceMetrics.estimatedLoadTime > 3) {
-      this.addRecommendation("Load time exceeds 3 seconds - optimize assets and consider CDN.");
+      this.addRecommendation('Load time exceeds 3 seconds - optimize assets and consider CDN.');
     }
   }
 
   private generateReport(): void {
-    console.log(colors.cyan("\n📊 Bundle Analysis Report"));
-    console.log(colors.cyan("=".repeat(60)));
+    logInfo('📊 Bundle Analysis Report');
+    logInfo('='.repeat(60));
 
-    console.log(
-      `📦 Total Bundle Size: ${this.formatBytes(this.stats.totalSize)}`
-    );
-    console.log(`📁 Total Files: ${this.stats.fileCount}`);
-    console.log(
-      `⏱️  Estimated Load Time: ${this.stats.performanceMetrics.estimatedLoadTime.toFixed(2)}s`
-    );
-    console.log(
-      `🗜️  Compressed Size: ${this.formatBytes(this.stats.totalSize * this.stats.performanceMetrics.compressionRatio)}`
-    );
+    logInfo(`📦 Total Bundle Size: ${this.formatBytes(this.stats.totalSize)}`);
+    logInfo(`📁 Total Files: ${this.stats.fileCount}`);
+    logInfo(`⏱️  Estimated Load Time: ${this.stats.performanceMetrics.estimatedLoadTime.toFixed(2)}s`);
+    logInfo(`🗜️  Compressed Size: ${this.formatBytes(this.stats.totalSize * this.stats.performanceMetrics.compressionRatio)}`);
 
-    console.log(colors.yellow("\n📋 File Type Breakdown:"));
+    logInfo('📋 File Type Breakdown:');
     Object.entries(this.stats.fileTypes)
       .sort(([, a], [, b]) => b.size - a.size)
       .forEach(([ext, stats]) => {
-        console.log(`  ${ext}: ${stats.count} files, ${this.formatBytes(stats.size)}`);
+        logInfo(`  ${ext}: ${stats.count} files, ${this.formatBytes(stats.size)}`);
       });
 
-    console.log(colors.yellow("\n🔝 Largest Files:"));
+    logInfo('🔝 Largest Files:');
     this.stats.largestFiles.slice(0, 5).forEach((file, index) => {
       const relativePath = relative(Deno.cwd(), file.path);
-      console.log(
-        `  ${index + 1}. ${relativePath} (${this.formatBytes(file.size)})`
-      );
+      logInfo(`  ${index + 1}. ${relativePath} (${this.formatBytes(file.size)})`);
     });
 
     if (this.recommendations.length > 0) {
-      console.log(colors.yellow("\n💡 Recommendations:"));
+      logWarn('💡 Recommendations:');
       this.recommendations.forEach((r) => {
-        console.log(`  • ${r}`);
+        logWarn(`  • ${r}`);
       });
     } else {
-      console.log(colors.green("\n✅ No critical issues detected."));
+      logSuccess('✅ No critical issues detected.');
     }
 
-    console.log(colors.cyan("=".repeat(60)));
+    logInfo('='.repeat(60));
   }
 
   private addRecommendation(msg: string) {
@@ -173,9 +166,9 @@ class BundleAnalyzer {
   }
 
   private formatBytes(bytes: number): string {
-    if (bytes === 0) return "0 Bytes";
+    if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
   }
@@ -194,40 +187,28 @@ class BundleAnalyzer {
     };
 
     try {
-      await Deno.writeTextFile(outputPath, JSON.stringify(report, null, 2));
-      this.log(`JSON report saved to: ${outputPath}`, "info");
+      await writeJsonFile(outputPath, report);
+      logSuccess(`JSON report saved to: ${outputPath}`);
     } catch (error) {
-      this.log(`Failed to save JSON report: ${error}`, "error");
+      logError(`Failed to save JSON report: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  private log(msg: string, level: "info" | "warn" | "error" | "debug" = "info") {
-    const prefix = {
-      info: colors.blue("ℹ️ "),
-      warn: colors.yellow("⚠️ "),
-      error: colors.red("❌ "),
-      debug: colors.gray("🐛 "),
-    }[level];
-    if (level === "debug" && !Deno.args.includes("--debug")) return;
-    console.log(prefix + msg);
   }
 }
 
-// CLI Interface
-if (import.meta.main) {
-  const args = Deno.args;
-  const bundlePath = args[0] || "./dist";
-  const jsonOutput = args.find((arg) => arg.startsWith("--json="))?.split("=")[1];
-
+async function main() {
   const analyzer = new BundleAnalyzer();
-
+  const bundlePath = Deno.args[0] || '.';
+  
   try {
-    await analyzer.analyzeBundle(bundlePath);
-    if (jsonOutput) {
-      await analyzer.generateJsonReport(jsonOutput);
-    }
+    const stats = await analyzer.analyzeBundle(bundlePath);
+    await analyzer.generateJsonReport('bundle-analysis.json');
+    logSuccess('Bundle analysis completed successfully!');
   } catch (error) {
-    console.error("❌ Analysis failed:", error);
+    logError(`Analysis failed: ${error instanceof Error ? error.message : String(error)}`);
     Deno.exit(1);
   }
+}
+
+if (import.meta.main) {
+  await main();
 }

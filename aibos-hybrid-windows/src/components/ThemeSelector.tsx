@@ -1,6 +1,9 @@
-import { memo, useState, useEffect, useRef } from 'react';
+/** @jsxImportSource react */
+import { memo, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useUIState } from '../store/uiState.ts';
 import { themeConfigs, getThemesByCategory, ThemeVariant } from '../utils/themeManager.ts';
+import { getColor, getGradient } from '../utils/themeHelpers.ts';
+import { animation } from '../utils/designTokens.ts';
 
 interface ThemeSelectorProps {
   onClose?: () => void;
@@ -8,7 +11,7 @@ interface ThemeSelectorProps {
 }
 
 export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWindow = false }) => {
-  const { theme, setTheme, cycleTheme } = useUIState();
+  const { theme, setTheme, colorMode } = useUIState();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -16,14 +19,20 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
   const searchInputRef = useRef<HTMLInputElement>(null);
   const themesByCategory = getThemesByCategory();
 
-  // Get all themes as flat array for search and navigation
-  const allThemes = (): ThemeVariant[] => {
-    return Object.values(themesByCategory).flat();
-  };
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
 
-  // Filter themes based on search and category
-  const filteredThemes = (): ThemeVariant[] => {
-    let themes = allThemes();
+  // Get all themes as flat array for search and navigation
+  const allThemes = useMemo((): ThemeVariant[] => {
+    return Object.values(themesByCategory).flat();
+  }, [themesByCategory]);
+
+  // Memoized filtered themes for performance
+  const filteredThemes = useMemo((): ThemeVariant[] => {
+    let themes = allThemes;
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -45,13 +54,59 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
     }
 
     return themes;
-  };
+  }, [allThemes, searchQuery, activeCategory]);
 
-  // Get unique categories
-  const categories = (): string[] => {
+  // Get unique categories with guard against empty config
+  const categories = useMemo((): string[] => {
     const cats = [...new Set(Object.values(themeConfigs).map(config => config.category))];
-    return ['all', ...cats.sort()];
-  };
+    const categoryList = ['all', ...cats.sort()];
+    return categoryList.length > 1 ? categoryList : ['all'];
+  }, []);
+
+  // Memoized theme styles for consistent theming
+  const themeStyles = useMemo(() => ({
+    container: {
+      backgroundColor: getColor('glass.light.90', colorMode),
+      border: `1px solid ${getColor('glass.light.60', colorMode)}`,
+      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    },
+    header: {
+      background: getGradient('professional.slate', colorMode),
+      borderBottom: `1px solid ${getColor('glass.light.40', colorMode)}`,
+    },
+    searchInput: {
+      backgroundColor: getColor('white', colorMode),
+      border: `1px solid ${getColor('gray.300', colorMode)}`,
+      color: getColor('gray.900', colorMode),
+      transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+    },
+    categoryTab: (isActive: boolean) => ({
+      backgroundColor: isActive 
+        ? getColor('primary.500', colorMode) 
+        : getColor('white', colorMode),
+      color: isActive 
+        ? getColor('white', colorMode) 
+        : getColor('gray.700', colorMode),
+      transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+    }),
+    themeCard: (isSelected: boolean, isHighlighted: boolean) => ({
+      border: `2px solid ${isSelected 
+        ? getColor('primary.500', colorMode) 
+        : isHighlighted 
+        ? getColor('primary.300', colorMode)
+        : getColor('gray.200', colorMode)}`,
+      backgroundColor: isSelected 
+        ? getColor('primary.50', colorMode) 
+        : isHighlighted 
+        ? getColor('primary.100', colorMode)
+        : 'transparent',
+      transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+    }),
+    footer: {
+      backgroundColor: getColor('gray.50', colorMode),
+      borderTop: `1px solid ${getColor('gray.200', colorMode)}`,
+    },
+  }), [colorMode, prefersReducedMotion]);
 
   // Focus search input when component mounts
   useEffect(() => {
@@ -62,14 +117,42 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
     }
   }, [isWindow]);
 
+  // Focus trap for modal mode
+  useEffect(() => {
+    if (isWindow) return;
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        const focusableElements = document.querySelectorAll(
+          'button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleTabKey);
+    return () => document.removeEventListener('keydown', handleTabKey);
+  }, [isWindow]);
+
   // Keyboard navigation
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const themes = filteredThemes();
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const themes = filteredThemes;
     
     switch (e.key) {
       case 'Escape':
         e.preventDefault();
-        onClose?.();
+        if (!isWindow) {
+          onClose?.();
+        }
         break;
       case 'ArrowDown':
         e.preventDefault();
@@ -98,27 +181,42 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
         break;
       case ' ':
         e.preventDefault();
-        cycleTheme();
+        // Cycle only filtered themes for consistency
+        if (themes.length > 0) {
+          const currentIndex = themes.findIndex(t => t === theme);
+          const nextIndex = currentIndex < themes.length - 1 ? currentIndex + 1 : 0;
+          handleThemeSelect(themes[nextIndex]);
+        }
         break;
     }
-  };
+  }, [filteredThemes, selectedIndex, theme, isWindow, onClose]);
 
-  const handleThemeSelect = (selectedTheme: ThemeVariant) => {
+  const handleThemeSelect = useCallback((selectedTheme: ThemeVariant) => {
     setTheme(selectedTheme);
     onClose?.();
-  };
+  }, [setTheme, onClose]);
 
-  const handlePreviewModeChange = (mode: 'gradient' | 'full' | 'minimal') => {
+  const handlePreviewModeChange = useCallback((mode: 'gradient' | 'full' | 'minimal') => {
     setPreviewMode(mode);
-  };
+  }, []);
 
-  const renderThemePreview = (themeVariant: ThemeVariant) => {
+  const handleFocus = useCallback((index: number) => {
+    setSelectedIndex(index);
+  }, []);
+
+  const renderThemePreview = useCallback((themeVariant: ThemeVariant) => {
     const config = themeConfigs[themeVariant];
     
     switch (previewMode) {
       case 'full':
         return (
-          <div className={`mt-3 h-16 rounded-lg ${config.gradient} relative overflow-hidden`}>
+          <div 
+            className="mt-3 rounded-lg relative overflow-hidden"
+            style={{
+              minHeight: '64px',
+              background: config.gradient,
+            }}
+          >
             <div className="absolute inset-0 bg-black/10"></div>
             <div className="absolute top-2 left-2 w-3 h-3 bg-white/20 rounded-full"></div>
             <div className="absolute top-2 right-2 w-8 h-2 bg-white/20 rounded"></div>
@@ -128,41 +226,71 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
         );
       case 'minimal':
         return (
-          <div className={`mt-2 h-4 rounded ${config.gradient} opacity-60`} />
+          <div 
+            className="mt-2 rounded-full"
+            style={{
+              minHeight: '8px',
+              background: config.gradient,
+              opacity: 0.6,
+            }}
+          />
         );
       default:
         return (
-          <div className={`mt-2 h-8 rounded ${config.gradient} opacity-80`} />
+          <div 
+            className="mt-2 rounded"
+            style={{
+              minHeight: '32px',
+              background: config.gradient,
+              opacity: 0.8,
+            }}
+          />
         );
     }
-  };
+  }, [previewMode]);
 
-  const themes = filteredThemes();
-  const categoryList = categories();
+  const themes = filteredThemes;
+  const categoryList = categories;
 
   return (
     <div className={`${isWindow ? 'h-full' : 'fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4'}`}>
-      <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl ${
-        isWindow ? 'h-full flex flex-col' : 'w-full max-w-4xl max-h-[90vh] overflow-hidden'
-      }`}>
+      <div 
+        style={themeStyles.container}
+        className={`rounded-xl ${
+          isWindow ? 'h-full flex flex-col' : 'w-full max-w-4xl max-h-[90vh] overflow-hidden'
+        }`}
+      >
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700">
+        <div 
+          style={themeStyles.header}
+          className="p-6"
+        >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               <span className="text-3xl">🎨</span>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                <h2 
+                  className="text-2xl font-bold"
+                  style={{ color: getColor('gray.900', colorMode) }}
+                >
                   Theme Selector
                 </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Choose from {allThemes().length} beautiful themes
+                <p 
+                  className="text-sm"
+                  style={{ color: getColor('gray.600', colorMode) }}
+                >
+                  Choose from {allThemes.length} beautiful themes
                 </p>
               </div>
             </div>
             {onClose && (
               <button
                 onClick={onClose}
-                className="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="p-2 transition-colors rounded-lg hover:bg-opacity-20"
+                style={{ 
+                  color: getColor('gray.500', colorMode),
+                  backgroundColor: getColor('glass.light.10', colorMode),
+                }}
                 aria-label="Close theme selector"
               >
                 ✕
@@ -180,21 +308,38 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={themeStyles.searchInput}
+                className="w-full px-4 py-3 rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Preview:</span>
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <span 
+                className="text-sm"
+                style={{ color: getColor('gray.600', colorMode) }}
+              >
+                Preview:
+              </span>
+              <div 
+                className="flex rounded-lg p-1"
+                style={{ backgroundColor: getColor('gray.100', colorMode) }}
+              >
                 {(['gradient', 'full', 'minimal'] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => handlePreviewModeChange(mode)}
                     className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                       previewMode === mode
-                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                        ? 'shadow-sm'
+                        : 'hover:text-gray-900'
                     }`}
+                    style={{
+                      backgroundColor: previewMode === mode 
+                        ? getColor('white', colorMode) 
+                        : 'transparent',
+                      color: previewMode === mode 
+                        ? getColor('gray.900', colorMode) 
+                        : getColor('gray.600', colorMode),
+                    }}
                   >
                     {mode.charAt(0).toUpperCase() + mode.slice(1)}
                   </button>
@@ -205,17 +350,20 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
         </div>
 
         {/* Category Tabs */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <div 
+          className="p-4"
+          style={{ 
+            backgroundColor: getColor('gray.50', colorMode),
+            borderBottom: `1px solid ${getColor('gray.200', colorMode)}`,
+          }}
+        >
           <div className="flex flex-wrap gap-2">
             {categoryList.map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  activeCategory === category
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                }`}
+                style={themeStyles.categoryTab(activeCategory === category)}
+                className="px-3 py-1.5 text-sm font-medium rounded-lg"
               >
                 {category === 'all' ? 'All Themes' : category}
               </button>
@@ -238,41 +386,55 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
                     type="button"
                     onClick={() => handleThemeSelect(themeVariant)}
                     onMouseEnter={() => setSelectedIndex(index)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
-                      isSelected
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg'
-                        : isHighlighted
-                        ? 'border-blue-300 dark:border-blue-600 bg-blue-25 dark:bg-blue-900/10'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md'
-                    }`}
+                    onFocus={() => handleFocus(index)}
+                    style={themeStyles.themeCard(isSelected, isHighlighted)}
+                    className="p-4 rounded-xl text-left group relative"
+                    aria-label={`Select theme ${config.name}`}
                   >
                     <div className="flex items-start space-x-3">
                       <div className="text-3xl">{config.icon}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                        <div 
+                          className="font-semibold truncate"
+                          style={{ color: getColor('gray.900', colorMode) }}
+                        >
                           {config.name}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                        <div 
+                          className="text-sm mt-1 line-clamp-2"
+                          style={{ color: getColor('gray.500', colorMode) }}
+                        >
                           {config.description}
                         </div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                        <div 
+                          className="text-xs mt-2"
+                          style={{ color: getColor('gray.400', colorMode) }}
+                        >
                           {config.category}
                         </div>
                       </div>
                       {isSelected && (
-                        <div className="text-blue-500 text-xl">✓</div>
+                        <div 
+                          className="text-xl"
+                          style={{ color: getColor('primary.500', colorMode) }}
+                        >
+                          ✓
+                        </div>
                       )}
                     </div>
                     
                     {/* Theme preview */}
                     {renderThemePreview(themeVariant)}
                     
-                    {/* Hover effect */}
-                    <div className={`absolute inset-0 rounded-xl transition-opacity duration-200 ${
-                      isSelected ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'
-                    }`}>
-                      <div className={`absolute inset-0 rounded-xl ${config.gradient} opacity-5`} />
-                    </div>
+                    {/* Enhanced hover effect */}
+                    <div 
+                      className="absolute inset-0 rounded-xl transition-opacity"
+                      style={{ 
+                        background: config.gradient,
+                        opacity: isSelected ? 0 : 0.1,
+                        transition: prefersReducedMotion ? 'none' : `opacity ${animation.duration.normal} ${animation.easing.smooth}`,
+                      }}
+                    />
                   </button>
                 );
               })}
@@ -280,17 +442,23 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
           ) : searchQuery.trim() ? (
             <div className="text-center py-12">
               <span className="text-6xl mb-4 block">🎨</span>
-              <p className="text-gray-600 dark:text-gray-400 mb-2">
+              <p 
+                className="mb-2"
+                style={{ color: getColor('gray.600', colorMode) }}
+              >
                 No themes found for "{searchQuery}"
               </p>
-              <p className="text-sm text-gray-500 dark:text-gray-500">
+              <p 
+                className="text-sm"
+                style={{ color: getColor('gray.500', colorMode) }}
+              >
                 Try different keywords or check your spelling
               </p>
             </div>
           ) : (
             <div className="text-center py-12">
               <span className="text-6xl mb-4 block">🎨</span>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p style={{ color: getColor('gray.600', colorMode) }}>
                 No themes available in this category
               </p>
             </div>
@@ -298,23 +466,40 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = memo(({ onClose, isWi
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-          <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-            <div className="flex items-center space-x-6">
+        <div 
+          style={themeStyles.footer}
+          className="p-6"
+        >
+          <div className="flex items-center justify-between text-sm">
+            <div 
+              className="flex items-center space-x-6"
+              style={{ color: getColor('gray.600', colorMode) }}
+            >
               <span>↑↓ Navigate</span>
               <span>Enter Select</span>
-              <span>Space Cycle</span>
+              <span>Space Cycle Filtered</span>
               <span>Esc Close</span>
             </div>
             <div className="flex items-center space-x-4">
-              <span>
-                {themes.length} of {allThemes().length} theme{themes.length !== 1 ? 's' : ''}
+              <span style={{ color: getColor('gray.600', colorMode) }}>
+                {themes.length} of {allThemes.length} theme{themes.length !== 1 ? 's' : ''}
               </span>
               <button
-                onClick={cycleTheme}
-                className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                onClick={() => {
+                  if (themes.length > 0) {
+                    const currentIndex = themes.findIndex(t => t === theme);
+                    const nextIndex = currentIndex < themes.length - 1 ? currentIndex + 1 : 0;
+                    handleThemeSelect(themes[nextIndex]);
+                  }
+                }}
+                disabled={themes.length === 0}
+                className="px-3 py-1.5 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                style={{
+                  backgroundColor: getColor('primary.500', colorMode),
+                  color: getColor('white', colorMode),
+                }}
               >
-                Quick Cycle
+                Cycle Filtered
               </button>
             </div>
           </div>

@@ -5,6 +5,15 @@
  * to improve initial bundle size and loading performance.
  */
 
+import { EnterpriseLogger } from '../services/core/logger';
+
+class CodeSplittingManager {
+  private logger = new EnterpriseLogger();
+  
+  // Replace:
+  // logWarn() → this.logger.warn('message', { component: 'CodeSplitting', action: 'actionName' })
+}
+
 // Simple loading component
 export const LoadingSpinner = (message: string = 'Loading...') => {
   const div = document.createElement('div');
@@ -28,7 +37,7 @@ export async function dynamicImport<T>(
       return await importFunc();
     } catch (error) {
       lastError = error as Error;
-      console.warn(`Import attempt ${attempt} failed:`, error);
+      logWarn(`Import attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
       
       if (attempt < maxRetries) {
         // Wait before retrying (exponential backoff)
@@ -77,7 +86,7 @@ export function preloadCriticalComponents() {
   schedulePreload(() => {
     criticalComponents.forEach(importFunc => {
       importFunc().catch(error => {
-        console.warn('Failed to preload component:', error);
+        logWarn(`Failed to preload component: ${error instanceof Error ? error.message : String(error)}`);
       });
     });
   });
@@ -103,4 +112,4 @@ export class ComponentRegistry {
   static clearCache() {
     this.cache.clear();
   }
-} 
+}

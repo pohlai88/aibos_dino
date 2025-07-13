@@ -1,0 +1,485 @@
+{
+  "timestamp": "2025-07-13T04:28:04.545Z",
+  "durationMs": 260,
+  "results": [
+    {
+      "file": "TypeScript Check",
+      "status": "error",
+      "message": "TypeScript errors found",
+      "optimizations": [
+        "Resolve errors to proceed"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\.ladle\\config.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\.ladle\\config.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\index.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\index.tsx",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\main.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\main.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\config.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\config.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\filesystem.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\filesystem.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\index.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\index.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\logging.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\logging.ts",
+      "optimizations": [
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\ssot-registry.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\ssot-registry.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\supabase-client.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\supabase-client.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\types.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\types.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\modules\\validation.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\modules\\validation.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\ai-bos-architecture-check.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\ai-bos-architecture-check.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\app-integration-generator.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\app-integration-generator.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\bundle-analyzer.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\bundle-analyzer.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\cleanup-workspace.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\cleanup-workspace.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\critical-fixes.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\critical-fixes.ts",
+      "optimizations": [
+        "React.memo already used",
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\migrate-to-supabase.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\migrate-to-supabase.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\optimize.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\optimize.ts",
+      "optimizations": [
+        "React.memo already used",
+        "useMemo already used for expensive calculations",
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\setup-supabase.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\setup-supabase.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\supabase-performance.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\supabase-performance.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\scripts\\validate-ssot.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\scripts\\validate-ssot.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\apps\\Calculator.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\apps\\Calculator.tsx",
+      "optimizations": [
+        "Consider using useCallback to avoid unnecessary re-renders"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\apps\\Files.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\apps\\Files.tsx",
+      "optimizations": [
+        "Consider adding React.memo for performance",
+        "Consider using useCallback to avoid unnecessary re-renders",
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\apps\\iPod.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\apps\\iPod.tsx",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\apps\\Notepad.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\apps\\Notepad.tsx",
+      "optimizations": [
+        "Consider using useCallback to avoid unnecessary re-renders",
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\AppStore.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\AppStore.tsx",
+      "optimizations": [
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\Clock.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\Clock.tsx",
+      "optimizations": [
+        "Consider adding React.memo for performance",
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\Desktop.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\Desktop.tsx",
+      "optimizations": [
+        "Consider adding React.memo for performance",
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\Dock.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\Dock.tsx",
+      "optimizations": [
+        "Consider using useCallback to avoid unnecessary re-renders",
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\MultiMonitorLayout.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\MultiMonitorLayout.tsx",
+      "optimizations": [
+        "Consider adding React.memo for performance",
+        "Consider using useCallback to avoid unnecessary re-renders",
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\PerformanceDashboard.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\PerformanceDashboard.tsx",
+      "optimizations": [
+        "React.memo already used",
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\PerformanceOptimizer.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\PerformanceOptimizer.tsx",
+      "optimizations": [
+        "React.memo already used",
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\PropertiesDialog.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\PropertiesDialog.tsx",
+      "optimizations": [
+        "Consider adding React.memo for performance",
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\ShortcutHelp.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\ShortcutHelp.tsx",
+      "optimizations": [
+        "React.memo already used",
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\Spotlight.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\Spotlight.tsx",
+      "optimizations": [
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\StartMenu.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\StartMenu.tsx",
+      "optimizations": [
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\TenantOnboarding.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\TenantOnboarding.tsx",
+      "optimizations": [
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\ThemeSelector.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\ThemeSelector.tsx",
+      "optimizations": [
+        "Consider adding React.memo for performance",
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\Tooltip.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\Tooltip.tsx",
+      "optimizations": [
+        "Consider adding React.memo for performance",
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\TopBar.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\TopBar.tsx",
+      "optimizations": [
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\components\\Window.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\components\\Window.tsx",
+      "optimizations": [
+        "useMemo already used for expensive calculations"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\aibos-platform.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\aibos-platform.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\appRegistry.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\appRegistry.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\enhancedSearchProvider.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\enhancedSearchProvider.ts",
+      "optimizations": [
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\fileIndexer.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\fileIndexer.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\monitorManager.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\monitorManager.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\searchRegistry.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\searchRegistry.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\shortcutManager.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\shortcutManager.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\supabase.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\supabase.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\services\\systemCommands.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\services\\systemCommands.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\showcase\\showcase.tsx",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\showcase\\showcase.tsx",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\store\\uiState.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\store\\uiState.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\types\\search.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\types\\search.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\audio.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\audio.ts",
+      "optimizations": [
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\codeSplitting.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\codeSplitting.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\designTokens.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\designTokens.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\haptics.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\haptics.ts",
+      "optimizations": [
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\performance.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\performance.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\responsive.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\responsive.ts",
+      "optimizations": [
+        "Consider using useCallback to avoid unnecessary re-renders"
+      ]
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\searchPerformance.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\searchPerformance.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\themeHelpers.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\themeHelpers.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\themeManager.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\themeManager.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\themeWrapper.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\themeWrapper.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\tokenToCss.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\tokenToCss.ts",
+      "optimizations": []
+    },
+    {
+      "file": "aibos-hybrid-windows\\src\\utils\\windowSnapping.ts",
+      "status": "success",
+      "message": "Optimizations completed for aibos-hybrid-windows\\src\\utils\\windowSnapping.ts",
+      "optimizations": [
+        "Consider removing console.log statements in production"
+      ]
+    },
+    {
+      "file": "Bundle Size Estimate",
+      "status": "success",
+      "message": "Estimated bundle size: 3126KB",
+      "optimizations": [
+        "Consider code splitting for large components",
+        "Use dynamic imports for lazy loading",
+        "Optimize images and static assets"
+      ]
+    }
+  ]
+}

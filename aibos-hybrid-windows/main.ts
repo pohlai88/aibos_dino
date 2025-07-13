@@ -2,7 +2,8 @@
 // import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { extname } from "https://deno.land/std@0.208.0/path/extname.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { SUPABASE_CONFIG } from '../config.ts';
+import { SUPABASE_CONFIG } from './modules/config.ts';
+import { logError } from './modules/logging.ts';
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.serviceRoleKey);
@@ -115,7 +116,7 @@ async function checkStorageQuota(tenantId: string, newNoteSize: number = 0): Pro
     };
 
   } catch (error) {
-    console.error("Storage quota check error:", error);
+    logError(`Storage quota check error: ${error instanceof Error ? error.message : String(error)}`);
     return { allowed: false, reason: "Storage quota check failed", currentUsage: null };
   }
 }
@@ -185,7 +186,7 @@ async function handleAPI(req: Request, path: string): Promise<Response> {
         .single();
 
       if (error) {
-        console.error("Supabase error:", error);
+        logError(`Supabase error: ${error.message}`);
         return new Response(
           JSON.stringify({ error: "Failed to save note" }),
           { 
@@ -223,7 +224,7 @@ async function handleAPI(req: Request, path: string): Promise<Response> {
         .order('updated_at', { ascending: false });
 
       if (error) {
-        console.error("Supabase error:", error);
+        logError(`Supabase error: ${error.message}`);
         return new Response(
           JSON.stringify({ error: "Failed to load notes" }),
           { 
@@ -375,7 +376,7 @@ async function handleAPI(req: Request, path: string): Promise<Response> {
         .eq('tenant_id', tenantId);
 
       if (error) {
-        console.error("Supabase error:", error);
+        logError(`Supabase error: ${error.message}`);
         return new Response(
           JSON.stringify({ error: "Failed to delete note" }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -406,7 +407,7 @@ async function handleAPI(req: Request, path: string): Promise<Response> {
         .single();
 
       if (error) {
-        console.error("Supabase error:", error);
+        logError(`Supabase error: ${error.message}`);
         return new Response(
           JSON.stringify({ error: "Failed to create tenant" }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -430,7 +431,7 @@ async function handleAPI(req: Request, path: string): Promise<Response> {
       }
     );
   } catch (error) {
-    console.error("API Error:", error);
+    logError(`API Error: ${error instanceof Error ? error.message : String(error)}`);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       { 

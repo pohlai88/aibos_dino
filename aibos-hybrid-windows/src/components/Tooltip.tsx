@@ -1,4 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+/** @jsxImportSource react */
+import React, { useState, useRef, useEffect, useCallback, useId } from 'react';
+import { getColor } from '../utils/themeHelpers.ts';
+import { useUIState } from '../store/uiState.ts';
+import { animation } from '../utils/designTokens.ts';
 
 interface TooltipProps {
   children: React.ReactNode;
@@ -24,14 +28,36 @@ export const Tooltip: React.FC<TooltipProps> = ({
   className = '',
   disabled = false,
   showArrow = true,
-  theme = 'dark',
+  theme = 'auto',
   size = 'md'
 }) => {
+  const { colorMode } = useUIState();
   const [isVisible, setIsVisible] = useState(false);
-  const [isDelayed, setIsDelayed] = useState(false);
-  const timeoutRef = useRef<number>();
+  const timeoutRef = useRef<number | undefined>(undefined);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
+  
+  // Generate unique ID for accessibility
+  const tooltipId = useId();
+
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = React.useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Check if child is already focusable
+  const isChildFocusable = React.useMemo(() => {
+    if (!React.isValidElement(children)) return false;
+    
+    const childType = typeof children.type === 'string' 
+      ? children.type.toLowerCase()
+      : '';
+    
+    return ['button', 'a', 'input', 'select', 'textarea'].includes(childType) ||
+           children.props?.tabIndex !== undefined ||
+           children.props?.role === 'button';
+  }, [children]);
 
   // Position classes mapping
   const positionClasses = {
@@ -45,24 +71,52 @@ export const Tooltip: React.FC<TooltipProps> = ({
     'bottom-right': 'top-full left-0 mt-2'
   };
 
-  // Arrow classes mapping
+  // Arrow classes mapping (without color - will be applied dynamically)
   const arrowClasses = {
-    'top': 'bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full border-t-gray-800',
-    'bottom': 'top-0 left-1/2 transform -translate-x-1/2 -translate-y-full border-b-gray-800',
-    'left': 'right-0 top-1/2 transform -translate-y-1/2 translate-x-full border-l-gray-800',
-    'right': 'left-0 top-1/2 transform -translate-y-1/2 -translate-x-full border-r-gray-800',
-    'top-left': 'bottom-0 right-2 translate-y-full border-t-gray-800',
-    'top-right': 'bottom-0 left-2 translate-y-full border-t-gray-800',
-    'bottom-left': 'top-0 right-2 -translate-y-full border-b-gray-800',
-    'bottom-right': 'top-0 left-2 -translate-y-full border-b-gray-800'
+    'top': 'bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full',
+    'bottom': 'top-0 left-1/2 transform -translate-x-1/2 -translate-y-full',
+    'left': 'right-0 top-1/2 transform -translate-y-1/2 translate-x-full',
+    'right': 'left-0 top-1/2 transform -translate-y-1/2 -translate-x-full',
+    'top-left': 'bottom-0 right-2 translate-y-full',
+    'top-right': 'bottom-0 left-2 translate-y-full',
+    'bottom-left': 'top-0 right-2 -translate-y-full',
+    'bottom-right': 'top-0 left-2 -translate-y-full'
   };
 
-  // Theme classes
-  const themeClasses = {
-    dark: 'bg-gray-800 text-white border-gray-700',
-    light: 'bg-white text-gray-900 border-gray-200 shadow-lg',
-    auto: 'bg-gray-800 text-white border-gray-700 dark:bg-white dark:text-gray-900 dark:border-gray-200'
+  // Arrow border classes based on position
+  const arrowBorderClasses = {
+    'top': 'border-t',
+    'bottom': 'border-b',
+    'left': 'border-l',
+    'right': 'border-r',
+    'top-left': 'border-t',
+    'top-right': 'border-t',
+    'bottom-left': 'border-b',
+    'bottom-right': 'border-b'
   };
+
+  // Get theme-aware styles
+  const getThemeStyles = useCallback(() => {
+    const effectiveTheme = theme === 'auto' ? colorMode : theme;
+    
+    if (effectiveTheme === 'light') {
+      return {
+        background: getColor('white', 'light'),
+        color: getColor('gray.900', 'light'),
+        border: `1px solid ${getColor('gray.200', 'light')}`,
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        arrowBorder: getColor('gray.200', 'light'),
+      };
+    } else {
+      return {
+        background: getColor('gray.800', 'dark'),
+        color: getColor('white', 'dark'),
+        border: `1px solid ${getColor('gray.700', 'dark')}`,
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+        arrowBorder: getColor('gray.700', 'dark'),
+      };
+    }
+  }, [theme, colorMode]);
 
   // Size classes
   const sizeClasses = {
@@ -71,24 +125,99 @@ export const Tooltip: React.FC<TooltipProps> = ({
     lg: 'text-base px-4 py-3'
   };
 
-  // Handle mouse enter with delay
-  const handleMouseEnter = useCallback(() => {
-    if (disabled) return;
-    
-    timeoutRef.current = setTimeout(() => {
-      setIsDelayed(true);
-      setIsVisible(true);
-    }, delay);
-  }, [disabled, delay]);
+  // Debounced viewport check for performance
+  const checkViewportPosition = useCallback(
+    React.useMemo(() => {
+      let timeoutId: number;
+      
+      return () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        
+        timeoutId = setTimeout(() => {
+          if (!isVisible || !tooltipRef.current || !triggerRef.current) return;
+          
+          const tooltip = tooltipRef.current;
+          const tooltipRect = tooltip.getBoundingClientRect();
+          
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          
+          // Reset any previous adjustments
+          tooltip.style.left = '';
+          tooltip.style.right = '';
+          tooltip.style.top = '';
+          tooltip.style.bottom = '';
+          tooltip.style.marginBottom = '';
+          tooltip.style.marginTop = '';
+          
+          // Check right overflow
+          if (tooltipRect.right > viewportWidth) {
+            tooltip.style.left = 'auto';
+            tooltip.style.right = '0';
+          }
+          
+          // Check left overflow
+          if (tooltipRect.left < 0) {
+            tooltip.style.right = 'auto';
+            tooltip.style.left = '0';
+          }
+          
+          // Check bottom overflow
+          if (tooltipRect.bottom > viewportHeight) {
+            tooltip.style.top = 'auto';
+            tooltip.style.bottom = '100%';
+            tooltip.style.marginBottom = '0.5rem';
+            tooltip.style.marginTop = '0';
+          }
+          
+          // Check top overflow
+          if (tooltipRect.top < 0) {
+            tooltip.style.bottom = 'auto';
+            tooltip.style.top = '100%';
+            tooltip.style.marginTop = '0.5rem';
+            tooltip.style.marginBottom = '0';
+          }
+        }, 50); // Small delay for performance
+      };
+    }, [isVisible]),
+    [isVisible]
+  );
 
-  // Handle mouse leave
-  const handleMouseLeave = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    setIsDelayed(false);
-    setIsVisible(false);
-  }, []);
+  // Handle mouse enter with delay
+  useEffect(() => {
+    if (!isVisible || !triggerRef.current) return;
+
+    const handleMouseEnter = () => {
+      if (delay > 0) {
+        timeoutRef.current = setTimeout(() => {
+          setIsVisible(true);
+        }, delay);
+      } else {
+        setIsVisible(true);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = undefined;
+      }
+      setIsVisible(false);
+    };
+
+    const trigger = triggerRef.current;
+    trigger.addEventListener('mouseenter', handleMouseEnter);
+    trigger.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      trigger.removeEventListener('mouseenter', handleMouseEnter);
+      trigger.removeEventListener('mouseleave', handleMouseLeave);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = undefined;
+      }
+    };
+  }, [delay, isVisible]);
 
   // Handle focus/blur for accessibility
   const handleFocus = useCallback(() => {
@@ -125,61 +254,61 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, []);
 
-  // Auto-position adjustment based on viewport
+  // Check viewport position when tooltip becomes visible
   useEffect(() => {
-    if (isVisible && tooltipRef.current && triggerRef.current) {
-      const tooltip = tooltipRef.current;
-      const tooltipRect = tooltip.getBoundingClientRect();
+    if (isVisible) {
+      // Initial check
+      checkViewportPosition();
       
-      // Check if tooltip goes outside viewport and adjust position
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
+      // Check on window resize
+      const handleResize = () => checkViewportPosition();
+      window.addEventListener('resize', handleResize);
       
-      if (tooltipRect.right > viewportWidth) {
-        tooltip.style.left = 'auto';
-        tooltip.style.right = '0';
-      }
-      
-      if (tooltipRect.bottom > viewportHeight) {
-        tooltip.style.top = 'auto';
-        tooltip.style.bottom = '100%';
-        tooltip.style.marginBottom = '0.5rem';
-        tooltip.style.marginTop = '0';
-      }
+      return () => window.removeEventListener('resize', handleResize);
     }
-  }, [isVisible, position]);
+  }, [isVisible, checkViewportPosition]);
 
   if (disabled) {
     return <>{children}</>;
   }
 
+  const themeStyles = getThemeStyles();
+  const wrapperProps = isChildFocusable
+    ? {}
+    : {
+        tabIndex: 0,
+        role: 'button',
+        onFocus: handleFocus,
+        onBlur: handleBlur
+      };
+
   return (
     <div
       ref={triggerRef}
       className={`relative inline-block ${className}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
-      tabIndex={0}
-      role="button"
-      aria-describedby={isVisible ? 'tooltip-content' : undefined}
+      {...wrapperProps}
+      aria-describedby={isVisible ? tooltipId : undefined}
     >
       {children}
       
       {isVisible && (
         <div
           ref={tooltipRef}
-          id="tooltip-content"
+          id={tooltipId}
+          style={{
+            maxWidth,
+            ...themeStyles,
+            transition: prefersReducedMotion 
+              ? 'none' 
+              : `opacity ${animation.duration.normal} ${animation.easing.smooth}, transform ${animation.duration.normal} ${animation.easing.smooth}`
+          }}
           className={`
             absolute z-[9999] ${positionClasses[position]}
-            transition-all duration-200 ease-out
-            ${isDelayed ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
-            ${themeClasses[theme]}
+            ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}
             ${sizeClasses[size]}
-            rounded-lg border shadow-lg
-            max-w-[${maxWidth}px]
+            rounded-lg
             whitespace-normal
+            pointer-events-none
           `}
           role="tooltip"
           aria-hidden={!isVisible}
@@ -190,7 +319,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
               className={`
                 absolute w-0 h-0 border-4 border-transparent
                 ${arrowClasses[position]}
-              `} 
+              `}
+              style={{
+                [arrowBorderClasses[position]]: `4px solid ${themeStyles.arrowBorder}`
+              }}
             />
           )}
           
@@ -199,8 +331,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
             <span>{content}</span>
             {shortcut && (
               <>
-                <span className="text-gray-400 dark:text-gray-500">•</span>
-                <kbd className="px-1.5 py-0.5 bg-gray-700 dark:bg-gray-600 rounded text-xs font-mono border border-gray-600 dark:border-gray-500">
+                <span style={{ color: getColor('gray.400', theme === 'auto' ? colorMode : theme) }}>•</span>
+                <kbd 
+                  className="px-1.5 py-0.5 rounded text-xs font-mono border"
+                  style={{
+                    backgroundColor: getColor('gray.700', theme === 'auto' ? colorMode : theme),
+                    borderColor: getColor('gray.600', theme === 'auto' ? colorMode : theme),
+                    color: getColor('white', theme === 'auto' ? colorMode : theme)
+                  }}
+                >
                   {shortcut}
                 </kbd>
               </>

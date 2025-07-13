@@ -1,5 +1,9 @@
 import { memo, useState, useEffect } from 'react';
 import { useUIState } from '../store/uiState.ts';
+import { getColorVarValue } from '../utils/themeHelpers.ts';
+import { audioManager } from '../utils/audio.ts';
+import { hapticManager } from '../utils/haptics.ts';
+import { useDeviceInfo } from '../utils/responsive.ts';
 
 interface DockItem {
   name: string;
@@ -43,14 +47,27 @@ const dockItems: DockItem[] = [
 ];
 
 export const Dock = memo(() => {
-  const { openWindow, openWindows, bringWindowToFront } = useUIState();
+  const { openWindow, openWindows, bringWindowToFront, colorMode } = useUIState();
+  const deviceInfo = useDeviceInfo();
+  const { isMobile, isTablet } = deviceInfo;
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(true);
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: DockItem } | null>(null);
+  
+  // Accessibility: Check for reduced motion preference
+  const prefersReducedMotion = typeof window !== 'undefined' 
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches 
+    : false;
 
-  // Auto-hide dock after inactivity
+  // Auto-hide dock after inactivity with performance optimization
   useEffect(() => {
+    // Disable auto-hide on mobile for better UX
+    if (isMobile) {
+      setIsVisible(true);
+      return;
+    }
+
     const handleActivity = () => {
       setLastActivity(Date.now());
       setIsVisible(true);
@@ -67,13 +84,14 @@ export const Dock = memo(() => {
     const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
     events.forEach(event => document.addEventListener(event, handleActivity));
     
-    const interval = setInterval(checkInactivity, 1000);
+    // Optimized interval - check every 3 seconds since threshold is 3s
+    const interval = setInterval(checkInactivity, 3000);
     
     return () => {
       events.forEach(event => document.removeEventListener(event, handleActivity));
       clearInterval(interval);
     };
-  }, [lastActivity]);
+  }, [lastActivity, isMobile]);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -103,6 +121,10 @@ export const Dock = memo(() => {
       // Launch new instance
       openWindow(item.component);
     }
+
+    // Play feedback
+    audioManager.playDockClick();
+    hapticManager.playDockClick();
   };
 
   const handleContextMenu = (event: React.MouseEvent, item: DockItem) => {
@@ -167,24 +189,57 @@ export const Dock = memo(() => {
 
   return (
     <div 
-      className={`fixed bottom-4 left-1/2 transform -translate-x-1/2 z-30 transition-all duration-500 ${
+      className={`fixed z-30 transition-all duration-500 ${
         isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
+      } ${
+        // Responsive positioning
+        isMobile 
+          ? 'bottom-2 left-2 right-2' 
+          : isTablet 
+            ? 'bottom-3 left-1/2 transform -translate-x-1/2' 
+            : 'bottom-4 left-1/2 transform -translate-x-1/2'
       }`}
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setLastActivity(Date.now())}
+      onMouseEnter={() => !isMobile && setIsVisible(true)}
+      onMouseLeave={() => !isMobile && setLastActivity(Date.now())}
     >
       {/* Dock background with enhanced glass effect */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-2xl px-6 py-3 shadow-2xl border border-white/20 dark:border-gray-700/50">
-        <div className="flex space-x-2">
+      <div 
+        style={{
+          backgroundColor: getColorVarValue('glass.light.20', colorMode),
+          backdropFilter: 'blur(40px)',
+          border: `1px solid ${getColorVarValue('glass.light.30', colorMode)}`,
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+        }}
+        className={`rounded-2xl ${
+          isMobile 
+            ? 'px-3 py-2' 
+            : isTablet 
+              ? 'px-4 py-2' 
+              : 'px-6 py-3'
+        }`}
+      >
+        <div className={`flex ${
+          isMobile 
+            ? 'justify-between space-x-1' 
+            : 'justify-center space-x-2'
+        }`}>
           {dockItems.map((item) => {
             const isRunning = runningApps.includes(item.component);
             const isHovered = hoveredItem === item.name;
             
             return (
               <div key={item.name} className="relative">
-                {/* Tooltip */}
-                {isHovered && (
-                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap z-50">
+                {/* Tooltip - hide on mobile */}
+                {isHovered && !isMobile && (
+                  <div 
+                    style={{
+                      backgroundColor: getColorVarValue('glass.dark.80', colorMode),
+                      backdropFilter: 'blur(8px)',
+                      border: `1px solid ${getColorVarValue('glass.dark.60', colorMode)}`,
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    }}
+                    className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 text-white text-sm rounded-lg whitespace-nowrap z-50"
+                  >
                     <div className="font-medium">{item.name}</div>
                     <div className="text-xs opacity-75">{item.description}</div>
                     {isRunning && (
@@ -197,33 +252,54 @@ export const Dock = memo(() => {
                 {/* Dock item button */}
                 <button
                   type="button"
-                  className={`relative w-14 h-14 flex items-center justify-center text-2xl rounded-xl transition-all duration-300 group ${
-                    isHovered 
-                      ? 'scale-125 bg-white/20 dark:bg-gray-700/20 shadow-lg' 
-                      : 'hover:scale-110 hover:bg-white/10 dark:hover:bg-gray-700/10'
-                  } ${isRunning ? 'ring-2 ring-blue-500/50' : ''}`}
+                  style={{
+                    backgroundColor: isHovered ? getColorVarValue('glass.light.30', colorMode) : getColorVarValue('glass.light.10', colorMode),
+                    backdropFilter: 'blur(4px)',
+                    border: `1px solid ${isHovered ? getColorVarValue('glass.light.40', colorMode) : getColorVarValue('glass.light.20', colorMode)}`,
+                    boxShadow: isHovered ? '0 4px 6px -1px rgba(0, 0, 0, 0.1)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    transform: isHovered && !prefersReducedMotion && !isMobile ? 'scale(1.25)' : 'scale(1)',
+                    transition: prefersReducedMotion ? 'none' : 'all 0.3s ease-in-out',
+                  }}
+                  className={`relative flex items-center justify-center rounded-xl group ${
+                    isRunning ? 'ring-2 ring-blue-500/50' : ''
+                  } ${
+                    isMobile 
+                      ? 'w-12 h-12 text-xl' 
+                      : isTablet 
+                        ? 'w-13 h-13 text-2xl' 
+                        : 'w-14 h-14 text-2xl'
+                  }`}
                   onClick={() => handleItemClick(item)}
                   onContextMenu={(event) => handleContextMenu(event, item)}
-                  onMouseEnter={() => setHoveredItem(item.name)}
-                  onMouseLeave={() => setHoveredItem(null)}
+                  onMouseEnter={() => {
+                    if (!isMobile) {
+                      setHoveredItem(item.name);
+                      audioManager.playDockHover();
+                      hapticManager.playDockHover();
+                    }
+                  }}
+                  onMouseLeave={() => !isMobile && setHoveredItem(null)}
                   onKeyDown={(event) => handleKeyDown(event, item)}
                   tabIndex={0}
-                  title={item.name}
+                  title={isMobile ? item.name : undefined}
+                  aria-label={`Launch ${item.name}`}
                 >
                   {/* Icon with enhanced styling */}
-                  <span className={`transition-all duration-300 ${
-                    isHovered ? 'scale-110' : 'scale-100'
+                  <span className={`${prefersReducedMotion ? '' : 'transition-all duration-300'} ${
+                    isHovered && !prefersReducedMotion && !isMobile ? 'scale-110' : 'scale-100'
                   }`}>
                     {item.icon}
                   </span>
                   
                   {/* Running indicator */}
                   {isRunning && (
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 animate-pulse"></div>
+                    <div className={`absolute -bottom-1 -right-1 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 animate-pulse ${
+                      isMobile ? 'w-2 h-2' : 'w-3 h-3'
+                    }`}></div>
                   )}
                   
-                  {/* Hover glow effect */}
-                  {isHovered && (
+                  {/* Hover glow effect - hide on mobile */}
+                  {isHovered && !isMobile && (
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-sm"></div>
                   )}
                 </button>
@@ -233,22 +309,32 @@ export const Dock = memo(() => {
         </div>
       </div>
       
-      {/* Dock separator line */}
-      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent mt-2"></div>
+      {/* Dock separator line - hide on mobile */}
+      {!isMobile && (
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-32 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent mt-2"></div>
+      )}
       
       {/* Context Menu */}
       {contextMenu && (
         <div 
-          className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 py-1 min-w-48"
-          style={{ 
+          style={{
+            backgroundColor: getColorVarValue('glass.light.80', colorMode),
+            backdropFilter: 'blur(8px)',
+            border: `1px solid ${getColorVarValue('glass.light.60', colorMode)}`,
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
             left: contextMenu.x, 
             top: contextMenu.y,
             transform: 'translate(-50%, -100%)'
           }}
+          className="fixed z-50 rounded-lg py-1 min-w-48"
+          role="menu"
+          aria-label="Dock context menu"
         >
           <button
             className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
             onClick={() => handleContextMenuAction('open', contextMenu.item)}
+            role="menuitem"
+            aria-label={`Open ${contextMenu.item.name}`}
           >
             <span>🚀</span>
             <span>Open {contextMenu.item.name}</span>
@@ -258,17 +344,21 @@ export const Dock = memo(() => {
             <button
               className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
               onClick={() => handleContextMenuAction('close', contextMenu.item)}
+              role="menuitem"
+              aria-label={`Close ${contextMenu.item.name}`}
             >
               <span>❌</span>
               <span>Close {contextMenu.item.name}</span>
             </button>
           )}
           
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+          <div className="border-t border-gray-200 dark:border-gray-700 my-1" role="separator"></div>
           
           <button
             className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
             onClick={() => handleContextMenuAction('info', contextMenu.item)}
+            role="menuitem"
+            aria-label={`About ${contextMenu.item.name}`}
           >
             <span>ℹ️</span>
             <span>About {contextMenu.item.name}</span>

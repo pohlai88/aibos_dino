@@ -1,8 +1,13 @@
 import { SearchProvider, SearchResult, SearchRegistry } from '../types/search.ts';
+import { EnterpriseLogger } from './core/logger';
 
-// Global search registry instance
-class GlobalSearchRegistry implements SearchRegistry {
-  providers = new Map<string, SearchProvider>();
+class SearchRegistryImpl implements SearchRegistry {
+  private providers = new Map<string, SearchProvider>();
+  private logger = new EnterpriseLogger();
+
+  // Replace logWarn calls with:
+  // this.logger.warn('message', { component: 'SearchRegistry', action: 'actionName' });
+  
   private cache = new Map<string, { timestamp: number; results: SearchResult[] }>();
   private cacheTTL = 10000; // 10 seconds
   private quickAccessCache: SearchResult[] | null = null;
@@ -34,7 +39,7 @@ class GlobalSearchRegistry implements SearchRegistry {
         this.cache.set(cacheKey, { timestamp: now, results });
         return results;
       } catch (error) {
-        console.warn(`Search provider ${provider.id} failed:`, error);
+        logWarn(`Search provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     });
@@ -58,7 +63,7 @@ class GlobalSearchRegistry implements SearchRegistry {
         onResult(results);
         return results;
       } catch (error) {
-        console.warn(`Search provider ${provider.id} failed:`, error);
+        logWarn(`Search provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`);
         return [];
       }
     });
@@ -80,7 +85,7 @@ class GlobalSearchRegistry implements SearchRegistry {
         try {
           return await provider.getQuickAccess(limit);
         } catch (error) {
-          console.warn(`Quick access from provider ${provider.id} failed:`, error);
+          logWarn(`Quick access from provider ${provider.id} failed: ${error instanceof Error ? error.message : String(error)}`);
           return [];
         }
       }
@@ -124,6 +129,10 @@ class GlobalSearchRegistry implements SearchRegistry {
 
 // Export singleton instance
 export const searchRegistry = new GlobalSearchRegistry();
+
+// Initialize enhanced search provider
+import { enhancedSearchProvider } from './enhancedSearchProvider.ts';
+searchRegistry.register(enhancedSearchProvider);
 
 // Utility function to create search results
 export const createSearchResult = (
@@ -192,4 +201,4 @@ export const createSystemSearchResult = (
   action,
   priority: 3,
   metadata: { systemAction },
-}); 
+});

@@ -1,5 +1,8 @@
 import React, { memo, useState, useRef, useEffect } from 'react';
 import { PropertiesDialog } from '../components/PropertiesDialog.tsx';
+import { VirtualScrolling } from '../utils/virtualScrolling.tsx';
+import { DragDropZone } from '../components/DragDropZone';
+import { systemIntegration } from '../services/systemIntegration';
 
 // Improved type definitions
 interface BaseItem {
@@ -258,13 +261,19 @@ export const Files: React.FC = memo(() => {
       case 'Enter':
         e.preventDefault();
         if (focusedIndex >= 0 && focusedIndex < fileItems.length) {
-          handleItemClick(fileItems[focusedIndex]);
+          const item = fileItems[focusedIndex];
+          if (item) {
+            handleItemClick(item);
+          }
         }
         break;
       case 'Delete':
         e.preventDefault();
         if (focusedIndex >= 0 && focusedIndex < fileItems.length) {
-          handleContextMenuAction('delete', fileItems[focusedIndex]);
+          const item = fileItems[focusedIndex];
+          if (item) {
+            handleContextMenuAction('delete', item);
+          }
         }
         break;
       case 'Escape':
@@ -449,8 +458,11 @@ export const Files: React.FC = memo(() => {
             </button>
           </div>
         ) : fileItems.length > 0 ? (
-          <div className="space-y-1">
-            {fileItems.map((item, index) => (
+          <VirtualScrolling
+            items={fileItems}
+            itemHeight={60}
+            containerHeight={400}
+            renderItem={(item, index) => (
               <div
                 key={item.id}
                 className={`flex items-center p-2 rounded cursor-pointer transition-colors ${
@@ -485,8 +497,8 @@ export const Files: React.FC = memo(() => {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
             <div className="text-6xl mb-4">📁</div>
@@ -537,3 +549,165 @@ export const Files: React.FC = memo(() => {
     </div>
   );
 });
+
+// Add import at the top
+import { DragDropZone } from '../components/DragDropZone';
+import { systemIntegration } from '../services/systemIntegration';
+
+// Add after existing state declarations
+const [fileMetadata, setFileMetadata] = useState<Map<string, any>>(new Map());
+const [bulkOperationProgress, setBulkOperationProgress] = useState<{
+  isActive: boolean;
+  completed: number;
+  total: number;
+  operation: string;
+}>({ isActive: false, completed: 0, total: 0, operation: '' });
+
+// Enhanced file drop handler
+const handleFilesDropped = useCallback(async (files: File[]) => {
+  console.log('Files dropped:', files);
+  
+  // Extract metadata for all files
+  const metadataMap = new Map();
+  for (const file of files) {
+    const metadata = await systemIntegration.extractFileMetadata(file);
+    metadataMap.set(file.name, metadata);
+  }
+  setFileMetadata(metadataMap);
+  
+  // Process files based on type
+  const categorizedFiles = files.reduce((acc, file) => {
+    const metadata = metadataMap.get(file.name);
+    if (!acc[metadata.category]) acc[metadata.category] = [];
+    acc[metadata.category].push(file);
+    return acc;
+  }, {} as Record<string, File[]>);
+  
+  console.log('Categorized files:', categorizedFiles);
+  
+  // Refresh file list
+  fetchFiles(pathParts.join('/'));
+}, [pathParts]);
+
+// Bulk operations handler
+const handleBulkOperation = async (operation: 'copy' | 'move' | 'delete', selectedFiles: string[]) => {
+  if (selectedFiles.length === 0) return;
+  
+  setBulkOperationProgress({
+    isActive: true,
+    completed: 0,
+    total: selectedFiles.length,
+    operation
+  });
+  
+  try {
+    // Convert selected IDs to File objects (this would need actual file handles in a real implementation)
+    const files = selectedFiles.map(id => {
+      const item = fileItems.find(f => f.id === id);
+      return new File([''], item?.name || '', { type: 'application/octet-stream' });
+    });
+    
+    const result = await systemIntegration.processBulkFiles(files, operation, {
+      onProgress: (completed, total) => {
+        setBulkOperationProgress(prev => ({ ...prev, completed, total }));
+      },
+      onError: (file, error) => {
+        console.error(`Error ${operation}ing ${file.name}:`, error);
+      }
+    });
+    
+    console.log(`Bulk ${operation} completed:`, result);
+    
+    // Refresh file list
+    fetchFiles(pathParts.join('/'));
+    setSelectedItems(new Set());
+  } catch (error) {
+    console.error(`Bulk ${operation} failed:`, error);
+  } finally {
+    setBulkOperationProgress({ isActive: false, completed: 0, total: 0, operation: '' });
+  }
+};
+
+// Enhanced context menu with bulk operations
+const handleContextMenuAction = async (action: string, item: FileItem) => {
+  console.log(`${action} action for:`, item.name);
+  
+  try {
+    switch (action) {
+      case 'open':
+        handleItemClick(item);
+        break;
+      case 'rename':
+        const newName = prompt('Enter new name:', item.name);
+        if (newName && newName.trim() && newName !== item.name) {
+          const result = await apiOperation('rename', { itemId: item.id, name: newName });
+          if (result.item) {
+            // Refresh the file list
+            fetchFiles(pathParts.join('/'));
+          }
+        }
+        break;
+      case 'copy':
+        // TODO: Implement copy functionality with target selection
+        console.log(`Copying ${item.name} to clipboard`);
+        break;
+      case 'cut':
+        // TODO: Implement cut functionality
+        console.log(`Cutting ${item.name} to clipboard`);
+        break;
+      case 'delete':
+        if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
+          const result = await deleteItemApi(item.id);
+          if (result.success) {
+            // Refresh the file list
+            fetchFiles(pathParts.join('/'));
+          }
+        }
+        break;
+      case 'properties':
+        setPropertiesDialog({ isVisible: true, item });
+        break;
+    }
+  } catch (err) {
+    console.error(`Error in ${action}:`, err);
+    alert(`Failed to ${action} "${item.name}". Please try again.`);
+  }
+};
+
+// Wrap the file list with enhanced DragDropZone
+<DragDropZone
+  onFilesDropped={handleFilesDropped}
+  acceptedTypes={['.txt', '.json', '.md', '.csv', '.jpg', '.png', '.pdf']}
+  multiple={true}
+  className="flex-1 min-h-0"
+  enableFolderDrop={true}
+  maxFileSize={50 * 1024 * 1024} // 50MB
+  onProgress={(completed, total) => {
+    console.log(`Processing: ${completed}/${total}`);
+  }}
+>
+  {/* existing file list content */}
+</DragDropZone>
+
+// Add bulk operation progress indicator
+{bulkOperationProgress.isActive && (
+  <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border">
+    <div className="flex items-center space-x-3">
+      <div className="text-2xl">⏳</div>
+      <div>
+        <div className="font-medium">
+          {bulkOperationProgress.operation.charAt(0).toUpperCase() + bulkOperationProgress.operation.slice(1)}ing files...
+        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">
+          {bulkOperationProgress.completed} of {bulkOperationProgress.total} completed
+        </div>
+        <div className="w-48 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
+          <div 
+            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${(bulkOperationProgress.completed / bulkOperationProgress.total) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+)}

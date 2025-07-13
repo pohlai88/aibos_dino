@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import glassmorphism effects */
+@import './src/utils/glassmorphism.css';
+
 body {
   background: linear-gradient(135deg, #4c1d95 0%, #7e22ce 100%);
   color: #fff;

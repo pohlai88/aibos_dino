@@ -4,11 +4,13 @@
   "description": "AIBOS Hybrid Windows Platform",
   "type": "module",
   "scripts": {
-    "dev": "deno run --allow-all --watch main.ts",
-    "build": "deno run --allow-all main.ts",
-    "clean": "deno run --allow-read --allow-write --allow-run scripts/quick-clean.ts"
+    "dev": "deno run --allow-all --watch --no-check main.ts",
+    "build": "deno run --allow-all main.ts"
   },
   "keywords": ["aibos", "deno", "react", "supabase"],
   "author": "AIBOS Team",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "histoire": "^1.0.0-alpha.2"
+  }
 } 

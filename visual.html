@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iPod UI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .slider::-webkit-slider-thumb {
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    .slider::-moz-range-thumb {
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      border: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen">
+
+  <div class="w-80 h-96 rounded-3xl p-6 shadow-2xl" style="background: linear-gradient(135deg, #334155, #1e293b); color: #ffffff;">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-xl font-bold">iPod</h2>
+      <button class="text-gray-400 hover:text-white transition-colors" aria-label="Close iPod">✕</button>
+    </div>
+
+    <!-- Error Message (hidden in normal state) -->
+    <!--
+    <div class="mb-4 p-2 bg-red-500/20 border border-red-500/30 rounded text-red-200 text-sm">
+      Playback failed
+    </div>
+    -->
+
+    <!-- Album Art -->
+    <div class="w-48 h-48 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+      <img 
+        src="/images/album-cover-1.jpg" 
+        alt="Album cover for Digital Dreams"
+        class="w-full h-full object-cover rounded-2xl"
+      />
+      <!-- OR fallback if no cover:
+      <div class="text-4xl" role="img" aria-label="Music note">🎵</div>
+      -->
+    </div>
+
+    <!-- Track Info -->
+    <div class="text-center mb-6">
+      <h3 class="text-lg font-semibold truncate" aria-label="Track title">Digital Dreams</h3>
+      <p class="text-gray-400 truncate" aria-label="Artist name">AI Composer</p>
+      <p class="text-sm text-gray-500 truncate" aria-label="Album name">Synthetic Symphony</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="mb-4">
+      <input
+        type="range"
+        min="0"
+        max="240"
+        value="42"
+        class="w-full h-2 rounded-lg appearance-none cursor-pointer slider"
+        style="background-color: #374151;"
+        aria-label="Track progress"
+        aria-valuemin="0"
+        aria-valuemax="240"
+        aria-valuenow="42"
+      />
+      <div class="flex justify-between text-xs text-gray-400 mt-1">
+        <span>0:42</span>
+        <span>4:00</span>
+      </div>
+    </div>
+
+    <!-- Volume Control -->
+    <div class="mb-6">
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-400" role="img" aria-label="Volume">🔊</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          value="0.5"
+          class="flex-1 h-2 rounded-lg appearance-none cursor-pointer slider"
+          style="background-color: #374151;"
+          aria-label="Volume control"
+          aria-valuemin="0"
+          aria-valuemax="1"
+          aria-valuenow="0.5"
+        />
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex justify-center items-center gap-4">
+      <button
+        class="w-12 h-12 rounded-full flex items-center justify-center transition-colors"
+        style="background-color: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2);"
+        aria-label="Previous track"
+      >
+        ⏮
+      </button>
+      <button
+        class="w-16 h-16 rounded-full flex items-center justify-center transition-colors"
+        style="background-color: #ffffff; color: #000000;"
+        aria-label="Play track"
+      >
+        ▶
+      </button>
+      <button
+        class="w-12 h-12 rounded-full flex items-center justify-center transition-colors"
+        style="background-color: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2);"
+        aria-label="Next track"
+      >
+        ⏭
+      </button>
+    </div>
+
+    <!-- Playlist Info -->
+    <div class="mt-4 text-center text-xs text-gray-400">
+      Track 1 of 3
+    </div>
+    
+  </div>
+
+</body>
+</html>

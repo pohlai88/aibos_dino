@@ -6,68 +6,12 @@ import { Tooltip } from './Tooltip.tsx';
 import { getColor, getGradient, applyThemeWithCSS } from '../utils/themeHelpers.ts';
 import { animation } from '../utils/designTokens.ts';
 import { NotificationCenter } from './NotificationCenter.tsx';
-import { notificationManager } from '../services/notificationManager.ts';
+// Replace the legacy import
+// import { notificationManager } from '../services/notificationManager.ts';
 
-// cSpell:disable-next-line
-const TOPBAR_HEIGHT = 'h-10';
-// cSpell:disable-next-line
-const TOPBAR_Z_INDEX = 'z-50';
-const LOGO_TEXT = 'AI-BOS';
-
-// System status types
-interface SystemStatus {
-  cpu: number;
-  memory: number;
-  network: 'online' | 'offline' | 'slow';
-  battery: number;
-  notifications: number;
-}
-
-const UserAvatar: React.FC = memo(() => {
-  const { toggleUserMenu, colorMode } = useUIState();
-
-  // Performance: Check for reduced motion preference
-  const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
-    []
-  );
-
-  // Performance: Memoized theme-aware styles
-  const avatarStyles = useMemo(() => ({
-    background: getGradient('branded.primary', colorMode),
-    backdropFilter: `blur(8px)`,
-    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
-  }), [colorMode, prefersReducedMotion]);
-
-  const handleUserMenu = useCallback(() => {
-    toggleUserMenu();
-  }, [toggleUserMenu]);
-
-  return (
-    <Tooltip content="User menu" shortcut="Ctrl+U" position="bottom">
-      <div
-        style={avatarStyles}
-        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-sm font-medium cursor-pointer hover:shadow-xl transform hover:scale-105"
-        role="button"
-        tabIndex={0}
-        aria-label="User menu"
-        aria-haspopup="true"
-        aria-expanded="false"
-        onClick={handleUserMenu}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleUserMenu();
-          }
-        }}
-      >
-        U
-      </div>
-    </Tooltip>
-  );
-});
+// Add this import instead
+import { notificationService } from '../services/notification-service.ts';
+import { SystemTray } from './SystemTray.tsx';
 
 const Logo: React.FC = memo(() => {
   const { navigateHome } = useUIState();
@@ -224,12 +168,26 @@ const NotificationButton: React.FC<{ onOpen: () => void }> = memo(({ onOpen }) =
 
   // Update unread count
   useEffect(() => {
-    const updateCount = () => setUnreadCount(notificationManager.getUnreadCount());
+    const updateCount = () => {
+      const notifications = notificationService.getHistory({ limit: 100 });
+      const unreadCount = notifications.filter(n => !n.metadata?.isRead).length;
+      setUnreadCount(unreadCount);
+    };
+    
     updateCount();
     
-    // Poll for updates
+    // Listen for notification events
+    const handleNotificationChange = () => updateCount();
+    notificationService.on('notification:delivered', handleNotificationChange);
+    notificationService.on('notification:dismissed', handleNotificationChange);
+    
     const interval = setInterval(updateCount, 1000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      clearInterval(interval);
+      notificationService.off('notification:delivered', handleNotificationChange);
+      notificationService.off('notification:dismissed', handleNotificationChange);
+    };
   }, []);
 
   return (
@@ -566,6 +524,9 @@ const TopBar: React.FC<TopBarProps> = ({ className = '', onOpenWindowGroups, onO
           <NotificationButton onOpen={onOpenNotifications} />
         )}
         
+        {/* System Tray */}
+        <SystemTray className="mr-3" />
+        
         {/* Theme Toggle Button */}
         <ThemeToggle />
         
@@ -588,3 +549,31 @@ ThemeToggle.displayName = 'ThemeToggle';
 SystemStatusIndicator.displayName = 'SystemStatusIndicator';
 NotificationIndicator.displayName = 'NotificationIndicator';
 SearchButton.displayName = 'SearchButton';
+
+// Update the unread count logic
+useEffect(() => {
+  const updateCount = () => {
+    const unreadCount = notificationService.getUnreadCount();
+    setUnreadCount(unreadCount);
+  };
+  
+  updateCount();
+  
+  // Listen for notification events for real-time updates
+  const handleNotificationChange = () => updateCount();
+  notificationService.on('notification:delivered', handleNotificationChange);
+  notificationService.on('notification:dismissed', handleNotificationChange);
+  notificationService.on('notification:read', handleNotificationChange);
+  notificationService.on('notification:bulk-read', handleNotificationChange);
+  
+  // Fallback polling (reduced frequency)
+  const interval = setInterval(updateCount, 5000); // Every 5 seconds instead of 1
+  
+  return () => {
+    clearInterval(interval);
+    notificationService.off('notification:delivered', handleNotificationChange);
+    notificationService.off('notification:dismissed', handleNotificationChange);
+    notificationService.off('notification:read', handleNotificationChange);
+    notificationService.off('notification:bulk-read', handleNotificationChange);
+  };
+}, []);

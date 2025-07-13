@@ -1,301 +1,460 @@
-import React, { useState, useCallback, useMemo } from 'react';
+/**
+ * Enterprise Notification Center Component - Enhanced Version
+ * Provides comprehensive notification management UI with enterprise-grade features
+ */
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUIState } from '../store/uiState.ts';
-import { getColor } from '../utils/themeHelpers.ts';
-import { useDeviceInfo } from '../utils/responsive.ts';
-import { notificationManager } from '../services/notificationManager.ts';
+import { notificationService, Notification, NotificationChannel } from '../services/notification-service';
+import { useMemoryCleanup } from '../utils/memory-management';
+import { usePerformanceTracking } from '../utils/performance-monitor';
 
 interface NotificationCenterProps {
-  isVisible: boolean;
-  onClose: () => void;
+  className?: string;
+  maxVisible?: number;
+  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+  theme?: 'light' | 'dark' | 'auto';
 }
 
-export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isVisible, onClose }) => {
-  const { colorMode } = useUIState();
-  const deviceInfo = useDeviceInfo();
-  const { isMobile, isTablet } = deviceInfo;
+export const NotificationCenter: React.FC<NotificationCenterProps> = ({
+  className = '',
+  maxVisible = 5,
+  position = 'top-right',
+  theme = 'auto'
+}) => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [filter, setFilter] = useState<{
+    type?: Notification['type'];
+    category?: string;
+    priority?: Notification['priority'];
+  }>({});
+  const [searchQuery, setSearchQuery] = useState('');
   
-  const [notifications, setNotifications] = useState(() => notificationManager.getNotifications());
-  const [showSettings, setShowSettings] = useState(false);
+  const { addCleanup } = useMemoryCleanup();
+  const { recordError } = usePerformanceTracking('NotificationCenter');
 
-  // Refresh notifications
-  const refreshNotifications = useCallback(() => {
-    setNotifications(notificationManager.getNotifications());
-  }, []);
+  // 🔥 ENHANCEMENT 1: Optimized filter function with memoization
+  const filterFunction = useCallback((notifications: Notification[]) => {
+    let filtered = notifications;
 
-  const handleMarkAsRead = useCallback((id: string) => {
-    notificationManager.markAsRead(id);
-    refreshNotifications();
-  }, [refreshNotifications]);
-
-  const handleRemove = useCallback((id: string) => {
-    notificationManager.remove(id);
-    refreshNotifications();
-  }, [refreshNotifications]);
-
-  const handleClearAll = useCallback(() => {
-    notificationManager.clearAll();
-    refreshNotifications();
-  }, [refreshNotifications]);
-
-  const getTypeColor = useCallback((type: string) => {
-    switch (type) {
-      case 'success': return 'text-green-500';
-      case 'warning': return 'text-yellow-500';
-      case 'error': return 'text-red-500';
-      default: return 'text-blue-500';
+    // Apply filters
+    if (filter.type) {
+      filtered = filtered.filter(n => n.type === filter.type);
     }
-  }, []);
-
-  const getTypeBg = useCallback((type: string) => {
-    switch (type) {
-      case 'success': return 'bg-green-100 dark:bg-green-900';
-      case 'warning': return 'bg-yellow-100 dark:bg-yellow-900';
-      case 'error': return 'bg-red-100 dark:bg-red-900';
-      default: return 'bg-blue-100 dark:bg-blue-900';
+    if (filter.category) {
+      filtered = filtered.filter(n => n.category === filter.category);
     }
-  }, []);
+    if (filter.priority) {
+      filtered = filtered.filter(n => n.priority === filter.priority);
+    }
 
-  // Performance: Check for reduced motion preference
-  const prefersReducedMotion = useMemo(() => 
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
-    []
-  );
+    // Apply search with optimized string matching
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(n => {
+        const titleMatch = n.title.toLowerCase().includes(query);
+        const messageMatch = n.message.toLowerCase().includes(query);
+        const categoryMatch = n.category?.toLowerCase().includes(query) || false;
+        return titleMatch || messageMatch || categoryMatch;
+      });
+    }
 
-  if (!isVisible) return null;
+    return filtered;
+  }, [filter.type, filter.category, filter.priority, searchQuery]);
+
+  // Memoized filtered notifications with performance optimization
+  const filteredNotifications = useMemo(() => {
+    return filterFunction(notifications);
+  }, [notifications, filterFunction]);
+
+  // Visible notifications (limited by maxVisible)
+  const visibleNotifications = useMemo(() => {
+    return isExpanded ? filteredNotifications : filteredNotifications.slice(0, maxVisible);
+  }, [filteredNotifications, isExpanded, maxVisible]);
+
+  // Setup event listeners
+  useEffect(() => {
+    const handleNotificationDelivered = (notification: Notification) => {
+      setNotifications(prev => {
+        // Check for duplicates
+        if (prev.some(n => n.id === notification.id)) {
+          return prev;
+        }
+        return [notification, ...prev].slice(0, 100); // Keep max 100 notifications
+      });
+    };
+
+    const handleNotificationDismissed = ({ notification }: { notification: Notification }) => {
+      setNotifications(prev => prev.filter(n => n.id !== notification.id));
+    };
+
+    const handleNotificationUpdated = (notification: Notification) => {
+      setNotifications(prev => 
+        prev.map(n => n.id === notification.id ? notification : n)
+      );
+    };
+
+    // Subscribe to notification events
+    notificationService.on('notification:delivered', handleNotificationDelivered);
+    notificationService.on('notification:dismissed', handleNotificationDismissed);
+    notificationService.on('notification:updated', handleNotificationUpdated);
+
+    // Cleanup function
+    const cleanup = () => {
+      notificationService.off('notification:delivered', handleNotificationDelivered);
+      notificationService.off('notification:dismissed', handleNotificationDismissed);
+      notificationService.off('notification:updated', handleNotificationUpdated);
+    };
+
+    addCleanup(cleanup);
+    return cleanup;
+  }, [addCleanup]);
+
+  // Load existing notifications on mount
+  useEffect(() => {
+    try {
+      const existingNotifications = notificationService.getHistory({ limit: 50 });
+      setNotifications(existingNotifications);
+    } catch (error) {
+      recordError(`Failed to load notifications: ${error}`);
+    }
+  }, [recordError]);
+
+  const handleDismiss = useCallback(async (id: string) => {
+    try {
+      await notificationService.dismiss(id, 'user');
+    } catch (error) {
+      recordError(`Failed to dismiss notification: ${error}`);
+    }
+  }, [recordError]);
+
+  const handleDismissAll = useCallback(async () => {
+    try {
+      const dismissPromises = visibleNotifications.map(n => 
+        notificationService.dismiss(n.id, 'user')
+      );
+      await Promise.all(dismissPromises);
+    } catch (error) {
+      recordError(`Failed to dismiss all notifications: ${error}`);
+    }
+  }, [visibleNotifications, recordError]);
+
+  const handleNotificationClick = useCallback((notification: Notification) => {
+    // Execute notification actions
+    if (notification.actions && notification.actions.length > 0) {
+      const primaryAction = notification.actions[0];
+      try {
+        primaryAction.action();
+      } catch (error) {
+        recordError(`Failed to execute notification action: ${error}`);
+      }
+    }
+
+    // Auto-dismiss unless persistent
+    if (!notification.persistent) {
+      handleDismiss(notification.id);
+    }
+  }, [handleDismiss, recordError]);
+
+  const getPositionClasses = () => {
+    const baseClasses = 'fixed z-50';
+    switch (position) {
+      case 'top-right':
+        return `${baseClasses} top-4 right-4`;
+      case 'top-left':
+        return `${baseClasses} top-4 left-4`;
+      case 'bottom-right':
+        return `${baseClasses} bottom-4 right-4`;
+      case 'bottom-left':
+        return `${baseClasses} bottom-4 left-4`;
+      default:
+        return `${baseClasses} top-4 right-4`;
+    }
+  };
+
+  const getNotificationIcon = (type: Notification['type']) => {
+    const icons = {
+      info: '🔵',
+      success: '✅',
+      warning: '⚠️',
+      error: '❌',
+      system: '⚙️'
+    };
+    return icons[type] || '📢';
+  };
+
+  const getPriorityColor = (priority: Notification['priority']) => {
+    const colors = {
+      low: 'border-gray-300 bg-gray-50',
+      normal: 'border-blue-300 bg-blue-50',
+      high: 'border-orange-300 bg-orange-50',
+      critical: 'border-red-300 bg-red-50'
+    };
+    return colors[priority] || colors.normal;
+  };
+
+  // 🔥 ENHANCEMENT 3: Customizable progress bar colors based on notification type
+  const getProgressBarColor = (type: Notification['type'], priority: Notification['priority']) => {
+    if (priority === 'critical') return 'bg-red-500';
+    if (priority === 'high') return 'bg-orange-500';
+    
+    const typeColors = {
+      error: 'bg-red-500',
+      warning: 'bg-yellow-500',
+      success: 'bg-green-500',
+      info: 'bg-blue-500',
+      system: 'bg-purple-500'
+    };
+    return typeColors[type] || 'bg-blue-500';
+  };
+
+  if (visibleNotifications.length === 0) {
+    return null;
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 300 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 300 }}
-      transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2 }}
-      className="fixed top-0 right-0 h-full w-80 z-50"
-      style={{
-        backgroundColor: getColor('glass.dark.20', colorMode),
-        backdropFilter: 'blur(16px)',
-        borderLeft: `1px solid ${getColor('glass.dark.30', colorMode)}`,
-      }}
-    >
-      {/* Header */}
+    <div className={`${getPositionClasses()} ${className}`}>
+      {/* 🔥 ENHANCEMENT 2: ARIA live region for screen reader announcements */}
       <div 
-        className="flex items-center justify-between p-4 border-b"
-        style={{ borderBottom: `1px solid ${getColor('glass.dark.30', colorMode)}` }}
+        role="status" 
+        aria-live="polite" 
+        aria-label="Notification updates"
+        className="sr-only"
       >
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Notifications ({notificationManager.getUnreadCount()})
-        </h2>
-        <div className="flex space-x-2">
-          <button
-            type="button"
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
-            aria-label="Settings"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        {visibleNotifications.length > 0 && 
+          `${visibleNotifications.length} notification${visibleNotifications.length === 1 ? '' : 's'} available`
+        }
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {showSettings ? (
-          <NotificationSettings onClose={() => setShowSettings(false)} />
-        ) : (
-          <div className="p-4 space-y-3">
-            {notifications.length === 0 ? (
-              <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-                <div className="text-4xl mb-4">🔔</div>
-                <div className="text-lg font-medium">No notifications</div>
-                <div className="text-sm">You're all caught up!</div>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {notifications.length} notification{notifications.length !== 1 ? 's' : ''}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    className="text-sm text-red-500 hover:text-red-700 transition-colors"
-                  >
-                    Clear all
-                  </button>
-                </div>
-
-                <AnimatePresence>
-                  {notifications.map((notification) => (
-                    <motion.div
-                      key={notification.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2 }}
-                      className={`
-                        p-3 rounded-lg border transition-all cursor-pointer
-                        ${notification.isRead 
-                          ? 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700' 
-                          : 'bg-white dark:bg-gray-700 border-blue-200 dark:border-blue-600'
-                        }
-                      `}
-                      onClick={() => handleMarkAsRead(notification.id)}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={`text-2xl ${getTypeColor(notification.type)}`}>
-                          {notification.icon || '📢'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                              {notification.title}
-                            </h3>
-                            <div className="flex items-center space-x-1">
-                              {!notification.isRead && (
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              )}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemove(notification.id);
-                                }}
-                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-xs text-gray-500 dark:text-gray-500">
-                              {new Date(notification.timestamp).toLocaleTimeString()}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded ${getTypeBg(notification.type)} ${getTypeColor(notification.type)}`}>
-                              {notification.type}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </>
-            )}
+      {/* Notification Header */}
+      {isExpanded && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border"
+          role="region"
+          aria-label="Notification center controls"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Notifications ({filteredNotifications.length})
+            </h3>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleDismissAll}
+                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded transition-colors"
+                aria-label={`Clear all ${visibleNotifications.length} notifications`}
+              >
+                Clear All
+              </button>
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                aria-label="Collapse notification center"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-        )}
+
+          {/* Search and Filters */}
+          <div className="space-y-3">
+            <input
+              type="text"
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              aria-label="Search notifications"
+            />
+            
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Notification filters">
+              <select
+                value={filter.type || ''}
+                onChange={(e) => setFilter(prev => ({ ...prev, type: e.target.value as Notification['type'] || undefined }))}
+                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                aria-label="Filter by notification type"
+              >
+                <option value="">All Types</option>
+                <option value="info">Info</option>
+                <option value="success">Success</option>
+                <option value="warning">Warning</option>
+                <option value="error">Error</option>
+                <option value="system">System</option>
+              </select>
+              
+              <select
+                value={filter.priority || ''}
+                onChange={(e) => setFilter(prev => ({ ...prev, priority: e.target.value as Notification['priority'] || undefined }))}
+                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                aria-label="Filter by notification priority"
+              >
+                <option value="">All Priorities</option>
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Notifications List */}
+      <div 
+        className="space-y-2 max-h-96 overflow-y-auto"
+        role="log"
+        aria-label="Notification list"
+        aria-live="polite"
+      >
+        <AnimatePresence mode="popLayout">
+          {visibleNotifications.map((notification, index) => (
+            <motion.div
+              key={notification.id}
+              layout
+              initial={{ opacity: 0, x: 300, scale: 0.8 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 300, scale: 0.8 }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 30,
+                delay: index * 0.05
+              }}
+              className={`
+                relative p-4 rounded-lg shadow-lg border-l-4 cursor-pointer
+                bg-white dark:bg-gray-800 hover:shadow-xl transition-all duration-200
+                ${getPriorityColor(notification.priority)}
+                max-w-sm
+              `}
+              onClick={() => handleNotificationClick(notification)}
+              role="alert" // 🔥 ENHANCEMENT 2: ARIA alert role for screen readers
+              aria-label={`${notification.type} notification: ${notification.title}`}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleNotificationClick(notification);
+                }
+              }}
+            >
+              {/* Notification Content */}
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0 text-xl" aria-hidden="true">
+                  {notification.icon || getNotificationIcon(notification.type)}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                      {notification.title}
+                    </h4>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDismiss(notification.id);
+                      }}
+                      className="ml-2 p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      aria-label={`Dismiss notification: ${notification.title}`}
+                    >
+                      <span className="text-xs text-gray-400">✕</span>
+                    </button>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 line-clamp-2">
+                    {notification.message}
+                  </p>
+                  
+                  {/* Metadata */}
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400">
+                      {notification.category && (
+                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                          {notification.category}
+                        </span>
+                      )}
+                      <span className={`px-2 py-1 rounded ${
+                        notification.priority === 'critical' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                        notification.priority === 'high' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
+                        notification.priority === 'normal' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                      }`}>
+                        {notification.priority}
+                      </span>
+                    </div>
+                    
+                    {notification.metadata?.createdAt && (
+                      <span className="text-xs text-gray-400">
+                        {new Date(notification.metadata.createdAt).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Actions */}
+                  {notification.actions && notification.actions.length > 0 && (
+                    <div className="flex space-x-2 mt-3" role="group" aria-label="Notification actions">
+                      {notification.actions.slice(0, 2).map((action) => (
+                        <button
+                          key={action.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            try {
+                              action.action();
+                            } catch (error) {
+                              recordError(`Action failed: ${error}`);
+                            }
+                          }}
+                          className={`
+                            px-3 py-1 text-xs rounded transition-colors
+                            ${
+                              action.style === 'primary' ? 'bg-blue-500 hover:bg-blue-600 text-white' :
+                              action.style === 'danger' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                              'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'
+                            }
+                          `}
+                          aria-label={`${action.label} for ${notification.title}`}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* 🔥 ENHANCEMENT 3: Enhanced progress bar with type-based colors */}
+              {notification.expiresAt && (
+                <motion.div
+                  className={`absolute bottom-0 left-0 h-1 rounded-b ${getProgressBarColor(notification.type, notification.priority)}`}
+                  initial={{ width: '100%' }}
+                  animate={{ width: '0%' }}
+                  transition={{
+                    duration: (notification.expiresAt.getTime() - Date.now()) / 1000,
+                    ease: 'linear'
+                  }}
+                  aria-label={`Notification expires in ${Math.ceil((notification.expiresAt.getTime() - Date.now()) / 1000)} seconds`}
+                />
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
-    </motion.div>
+
+      {/* Expand/Collapse Button */}
+      {filteredNotifications.length > maxVisible && (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mt-2 w-full p-2 text-sm bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border rounded-lg transition-colors"
+          aria-label={isExpanded ? 'Show fewer notifications' : `Show all ${filteredNotifications.length - maxVisible} additional notifications`}
+        >
+          {isExpanded ? 'Show Less' : `Show All (${filteredNotifications.length - maxVisible} more)`}
+        </motion.button>
+      )}
+    </div>
   );
 };
 
-// Notification Settings Component
-const NotificationSettings: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { colorMode } = useUIState();
-  const [settings, setSettings] = useState(() => notificationManager.getSettings());
-
-  const handleSettingChange = useCallback((key: string, value: any) => {
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    notificationManager.updateSettings(newSettings);
-  }, [settings]);
-
-  return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-md font-medium text-gray-900 dark:text-white">Notification Settings</h3>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.enabled}
-            onChange={(e) => handleSettingChange('enabled', e.target.checked)}
-            className="mr-3"
-          />
-          <span className="text-sm text-gray-900 dark:text-white">Enable notifications</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.sound}
-            onChange={(e) => handleSettingChange('sound', e.target.checked)}
-            className="mr-3"
-          />
-          <span className="text-sm text-gray-900 dark:text-white">Play notification sounds</span>
-        </label>
-
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={settings.desktop}
-            onChange={(e) => handleSettingChange('desktop', e.target.checked)}
-            className="mr-3"
-          />
-          <span className="text-sm text-gray-900 dark:text-white">Show desktop notifications</span>
-        </label>
-
-        <div>
-          <label className="block text-sm text-gray-900 dark:text-white mb-2">
-            Notification duration (seconds)
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="30"
-            value={settings.duration / 1000}
-            onChange={(e) => handleSettingChange('duration', parseInt(e.target.value) * 1000)}
-            className="w-full"
-          />
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {settings.duration / 1000} seconds
-          </span>
-        </div>
-
-        <div>
-          <label className="block text-sm text-gray-900 dark:text-white mb-2">
-            Position
-          </label>
-          <select
-            value={settings.position}
-            onChange={(e) => handleSettingChange('position', e.target.value)}
-            className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-          >
-            <option value="top-right">Top Right</option>
-            <option value="top-left">Top Left</option>
-            <option value="bottom-right">Bottom Right</option>
-            <option value="bottom-left">Bottom Left</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  );
-}; 
+export default NotificationCenter;

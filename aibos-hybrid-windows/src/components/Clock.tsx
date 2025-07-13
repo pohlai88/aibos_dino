@@ -1,4 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { getColor } from '../utils/themeHelpers.ts';
+import type { ThemeMode } from '../utils/themeHelpers.ts';
+import { blur, elevation, animation } from '../utils/designTokens.ts';
+import { useUIState } from '../store/uiState.ts';
 
 // Types
 interface Timezone {
@@ -87,10 +91,26 @@ const useClock = (timezone: Timezone) => {
   const [now, setNow] = useState(new Date());
   const requestRef = useRef<number>();
 
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
   useEffect(() => {
-    const animate = (time: number) => {
-      setNow(new Date());
-      requestRef.current = requestAnimationFrame(animate);
+    // Skip animation frame updates if user prefers reduced motion
+    if (prefersReducedMotion) {
+      const interval = setInterval(() => {
+        setNow(new Date());
+      }, 1000); // Update every second instead of every frame
+      
+      return () => clearInterval(interval);
+    }
+
+    const animate = () => {
+      const now = new Date();
+      setNow(now);
+      requestAnimationFrame(animate);
     };
     requestRef.current = requestAnimationFrame(animate);
     
@@ -99,7 +119,7 @@ const useClock = (timezone: Timezone) => {
         cancelAnimationFrame(requestRef.current);
       }
     };
-  }, []);
+  }, [prefersReducedMotion]);
 
   const timezoneTime = useMemo(() => getTimezoneTime(now, timezone), [now, timezone]);
   
@@ -194,32 +214,74 @@ const useWeather = (timezone: Timezone) => {
 const ModeSelector: React.FC<{
   mode: ClockMode;
   onModeChange: (mode: ClockMode) => void;
-}> = ({ mode, onModeChange }) => (
-  <div className="flex space-x-1 mb-3" role="tablist" aria-label="Clock modes">
-    {(['clock', 'stopwatch', 'timer'] as const).map((m) => (
-      <button
-        key={m}
-        role="tab"
-        aria-selected={mode === m}
-        onClick={() => onModeChange(m)}
-        className={`px-2 py-1 text-xs rounded transition-colors ${
-          mode === m
-            ? 'bg-white bg-opacity-20 text-white'
-            : 'text-white text-opacity-60 hover:text-opacity-80'
-        }`}
-      >
-        {m.charAt(0).toUpperCase() + m.slice(1)}
-      </button>
-    ))}
-  </div>
-);
+  colorMode: ThemeMode;
+}> = ({ mode, onModeChange, colorMode }) => {
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    active: {
+      backgroundColor: getColor('glass.light.20', colorMode),
+      color: getColor('white', colorMode),
+    },
+    inactive: {
+      color: getColor('gray.300', colorMode),
+    },
+  }), [colorMode]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, currentMode: ClockMode) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      const modes: ClockMode[] = ['clock', 'stopwatch', 'timer'];
+      const currentIndex = modes.indexOf(currentMode);
+      const direction = e.key === 'ArrowLeft' ? -1 : 1;
+      const newIndex = (currentIndex + direction + modes.length) % modes.length;
+      onModeChange(modes[newIndex]);
+    }
+  }, [onModeChange]);
+
+  return (
+    <div className="flex space-x-1 mb-3" role="tablist" aria-label="Clock modes">
+      {(['clock', 'stopwatch', 'timer'] as const).map((m) => (
+        <button
+          key={m}
+          role="tab"
+          aria-selected={mode === m}
+          onClick={() => onModeChange(m)}
+          onKeyDown={(e) => handleKeyDown(e, m)}
+          style={mode === m ? buttonStyles.active : buttonStyles.inactive}
+          className="px-2 py-1 text-xs rounded transition-colors hover:bg-opacity-80"
+        >
+          {m.charAt(0).toUpperCase() + m.slice(1)}
+        </button>
+      ))}
+    </div>
+  );
+};
 
 const TimezoneSelector: React.FC<{
   timezone: Timezone;
   onTimezoneChange: (timezone: Timezone) => void;
-}> = ({ timezone, onTimezoneChange }) => {
+  colorMode: ThemeMode;
+}> = ({ timezone, onTimezoneChange, colorMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Performance: Memoized theme-aware styles
+  const dropdownStyles = useMemo(() => ({
+    backgroundColor: getColor('glass.dark.90', colorMode),
+    backdropFilter: `blur(${blur.md})`,
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+    boxShadow: elevation.lg,
+  }), [colorMode]);
+
+  const optionStyles = useMemo(() => ({
+    active: {
+      backgroundColor: getColor('glass.light.20', colorMode),
+      color: getColor('white', colorMode),
+    },
+    inactive: {
+      color: getColor('gray.300', colorMode),
+    },
+  }), [colorMode]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -240,13 +302,16 @@ const TimezoneSelector: React.FC<{
         className="text-xs text-white text-opacity-80 hover:text-opacity-100 transition-colors"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-label={`Select timezone (current: ${timezone.label})`}
       >
         {timezone.label} ▼
       </button>
       {isOpen && (
         <div 
-          className="absolute top-full left-0 mt-1 bg-gray-800 bg-opacity-90 rounded-lg p-2 z-10 min-w-32"
+          className="absolute top-full left-0 mt-1 rounded-lg p-2 z-10 min-w-32"
+          style={dropdownStyles}
           role="listbox"
+          aria-label="Timezone options"
         >
           {TIMEZONES.map((tz) => (
             <button
@@ -257,11 +322,8 @@ const TimezoneSelector: React.FC<{
                 onTimezoneChange(tz);
                 setIsOpen(false);
               }}
-              className={`block w-full text-left px-2 py-1 text-xs rounded ${
-                timezone.name === tz.name
-                  ? 'bg-white bg-opacity-20 text-white'
-                  : 'text-white text-opacity-70 hover:text-opacity-100'
-              }`}
+              style={timezone.name === tz.name ? optionStyles.active : optionStyles.inactive}
+              className="block w-full text-left px-2 py-1 text-xs rounded hover:bg-opacity-80"
             >
               {tz.label}
             </button>
@@ -275,7 +337,8 @@ const TimezoneSelector: React.FC<{
 const AnalogClock: React.FC<{
   time: Date;
   timezone: Timezone;
-}> = ({ time, timezone }) => {
+  colorMode: ThemeMode;
+}> = ({ time, timezone, colorMode }) => {
   const hours = time.getHours();
   const minutes = time.getMinutes();
   const seconds = time.getSeconds();
@@ -285,27 +348,59 @@ const AnalogClock: React.FC<{
   const minDeg = (minutes + seconds / 60) * 6;
   const secDeg = (seconds + ms / 1000) * 6;
 
+  // Performance: Memoized theme-aware styles
+  const clockStyles = useMemo(() => ({
+    hourHand: {
+      backgroundColor: getColor('white', colorMode),
+      boxShadow: `0 0 1.5px ${getColor('white', colorMode)}80`,
+    },
+    minuteHand: {
+      backgroundColor: getColor('primary.400', colorMode),
+      boxShadow: `0 0 1.5px ${getColor('white', colorMode)}80`,
+    },
+    secondHand: {
+      backgroundColor: getColor('info.500', colorMode),
+      boxShadow: `0 0 4px ${getColor('info.500', colorMode)}99`,
+    },
+    centerCap: {
+      backgroundColor: getColor('white', colorMode),
+      border: `1.5px solid ${getColor('primary.500', colorMode)}`,
+      boxShadow: `0 0 4px ${getColor('white', colorMode)}80`,
+    },
+    tick: {
+      backgroundColor: getColor('white', colorMode),
+    },
+  }), [colorMode]);
+
   return (
-    <div className="relative flex items-center justify-center mx-auto mb-2" style={{ width: 68, height: 68 }}>
+    <div 
+      className="relative flex items-center justify-center mx-auto mb-2" 
+      style={{ width: 68, height: 68 }}
+      role="img"
+      aria-label={`Analog clock showing ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} in ${timezone.label}`}
+    >
       {/* Ticks */}
       {[...Array(12)].map((_, i) => (
         <div
           key={i}
-          className="absolute bg-white bg-opacity-20 rounded"
+          className="absolute rounded"
           style={{
+            ...clockStyles.tick,
             width: 1.2,
             height: 6,
             left: '50%',
             top: 4,
             transform: `rotate(${i * 30}deg) translate(-50%, 0)`,
             transformOrigin: '50% 32px',
+            opacity: 0.2,
           }}
         />
       ))}
       {/* Hour hand */}
       <div
-        className="absolute bg-white rounded"
+        className="absolute rounded"
         style={{
+          ...clockStyles.hourHand,
           width: 4,
           height: 20,
           left: '50%',
@@ -313,51 +408,47 @@ const AnalogClock: React.FC<{
           transform: `translate(-50%, -100%) rotate(${hourDeg}deg)`,
           transformOrigin: '50% 100%',
           zIndex: 3,
-          boxShadow: '0 0 1.5px #fff8',
         }}
       />
       {/* Minute hand */}
       <div
         className="absolute rounded"
         style={{
+          ...clockStyles.minuteHand,
           width: 2.5,
           height: 28,
-          background: '#fbbf24',
           left: '50%',
           top: '50%',
           transform: `translate(-50%, -100%) rotate(${minDeg}deg)`,
           transformOrigin: '50% 100%',
           zIndex: 2,
-          boxShadow: '0 0 1.5px #fff8',
         }}
       />
       {/* Second hand */}
       <div
         className="absolute rounded"
         style={{
+          ...clockStyles.secondHand,
           width: 1.5,
           height: 33,
-          background: '#60a5fa',
           left: '50%',
           top: '50%',
           transform: `translate(-50%, -100%) rotate(${secDeg}deg)`,
           transformOrigin: '50% 100%',
           zIndex: 1,
-          boxShadow: '0 0 4px #60a5fa99',
         }}
       />
       {/* Center cap */}
       <div
-        className="absolute bg-white rounded-full border"
+        className="absolute rounded-full border"
         style={{
+          ...clockStyles.centerCap,
           width: 7,
           height: 7,
           left: '50%',
           top: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 10,
-          boxShadow: '0 0 4px #fff8',
-          border: '1.5px solid #818cf8',
         }}
       />
       {/* City label */}
@@ -371,6 +462,7 @@ const AnalogClock: React.FC<{
           textShadow: '0 1px 4px #0008',
           pointerEvents: 'none',
         }}
+        aria-hidden="true"
       >
         {timezone.name}
       </div>
@@ -381,7 +473,8 @@ const AnalogClock: React.FC<{
 const ClockMode: React.FC<{
   time: Date;
   weather: Weather | null;
-}> = ({ time, weather }) => {
+  colorMode: ThemeMode;
+}> = ({ time, weather, colorMode }) => {
   const pad = (n: number) => n.toString().padStart(2, '0');
   const hours = time.getHours();
   const minutes = time.getMinutes();
@@ -390,20 +483,47 @@ const ClockMode: React.FC<{
     weekday: 'long', month: 'short', day: 'numeric', year: 'numeric',
   });
 
+  // Performance: Memoized theme-aware styles
+  const textStyles = useMemo(() => ({
+    date: {
+      color: getColor('info.300', colorMode),
+    },
+    weather: {
+      color: getColor('gray.300', colorMode),
+    },
+  }), [colorMode]);
+
   return (
     <>
       {/* Digital Time */}
-      <div className="text-center font-mono font-semibold tracking-wider mb-1" style={{ fontSize: '0.85rem' }}>
+      <div 
+        className="text-center font-mono font-semibold tracking-wider mb-1" 
+        style={{ fontSize: '0.85rem' }}
+        role="status"
+        aria-live="polite"
+        aria-label={`Digital time: ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`}
+      >
         {pad(hours)}:{pad(minutes)}:{pad(seconds)}
       </div>
       {/* Date */}
-      <div className="text-center" style={{ fontSize: '0.65rem', color: '#bae6fd', fontWeight: 400, marginBottom: '0.2rem' }}>
+      <div 
+        className="text-center font-normal mb-1" 
+        style={{ 
+          fontSize: '0.65rem', 
+          marginBottom: '0.2rem',
+          ...textStyles.date,
+        }}
+      >
         {dateStr}
       </div>
       {/* Weather */}
       {weather && (
-        <div className="text-center text-xs text-white text-opacity-80">
-          {weather.icon} {weather.temperature}°C {weather.condition}
+        <div 
+          className="text-center text-xs"
+          style={textStyles.weather}
+          aria-label={`Weather: ${weather.temperature}°C, ${weather.condition}`}
+        >
+          <span aria-hidden="true">{weather.icon}</span> {weather.temperature}°C {weather.condition}
         </div>
       )}
     </>
@@ -412,99 +532,151 @@ const ClockMode: React.FC<{
 
 const StopwatchMode: React.FC<{
   stopwatch: ReturnType<typeof useStopwatch>;
-}> = ({ stopwatch }) => (
-  <>
-    {/* Stopwatch Display */}
-    <div className="text-center font-mono font-semibold tracking-wider mb-2" style={{ fontSize: '1.1rem' }}>
-      {formatTime(stopwatch.time)}
-    </div>
-    {/* Stopwatch Controls */}
-    <div className="flex space-x-2 mb-2">
-      <button
-        onClick={stopwatch.running ? stopwatch.pause : stopwatch.start}
-        className="px-3 py-1 text-xs bg-white bg-opacity-20 text-white rounded hover:bg-opacity-30"
-        aria-label={stopwatch.running ? 'Pause stopwatch' : 'Start stopwatch'}
+  colorMode: ThemeMode;
+}> = ({ stopwatch, colorMode }) => {
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    backgroundColor: getColor('glass.light.20', colorMode),
+    color: getColor('white', colorMode),
+    transition: `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode]);
+
+  return (
+    <>
+      {/* Stopwatch Display */}
+      <div 
+        className="text-center font-mono font-semibold tracking-wider mb-2" 
+        style={{ fontSize: '1.1rem' }}
+        role="status"
+        aria-live="polite"
+        aria-label={`Stopwatch: ${formatTime(stopwatch.time)}`}
       >
-        {stopwatch.running ? 'Pause' : 'Start'}
-      </button>
-      <button
-        onClick={stopwatch.reset}
-        className="px-3 py-1 text-xs bg-white bg-opacity-20 text-white rounded hover:bg-opacity-30"
-        aria-label="Reset stopwatch"
-      >
-        Reset
-      </button>
-      <button
-        onClick={stopwatch.lap}
-        className="px-3 py-1 text-xs bg-white bg-opacity-20 text-white rounded hover:bg-opacity-30"
-        aria-label="Record lap time"
-      >
-        Lap
-      </button>
-    </div>
-    {/* Lap Times */}
-    {stopwatch.laps.length > 0 && (
-      <div className="max-h-16 overflow-y-auto text-xs text-white text-opacity-70">
-        {stopwatch.laps.map((lap, index) => (
-          <div key={index} className="text-center">
-            Lap {index + 1}: {formatTime(lap)}
-          </div>
-        ))}
+        {formatTime(stopwatch.time)}
       </div>
-    )}
-  </>
-);
+      {/* Stopwatch Controls */}
+      <div className="flex space-x-2 mb-2">
+        <button
+          onClick={stopwatch.running ? stopwatch.pause : stopwatch.start}
+          style={buttonStyles}
+          className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
+          aria-label={stopwatch.running ? 'Pause stopwatch' : 'Start stopwatch'}
+        >
+          {stopwatch.running ? 'Pause' : 'Start'}
+        </button>
+        <button
+          onClick={stopwatch.reset}
+          style={buttonStyles}
+          className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
+          aria-label="Reset stopwatch"
+        >
+          Reset
+        </button>
+        <button
+          onClick={stopwatch.lap}
+          style={buttonStyles}
+          className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
+          aria-label="Record lap time"
+        >
+          Lap
+        </button>
+      </div>
+      {/* Lap Times */}
+      {stopwatch.laps.length > 0 && (
+        <div 
+          className="max-h-16 overflow-y-auto text-xs text-white text-opacity-70"
+          role="log"
+          aria-label="Lap times"
+        >
+          {stopwatch.laps.map((lap, index) => (
+            <div key={index} className="text-center">
+              Lap {index + 1}: {formatTime(lap)}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+};
 
 const TimerMode: React.FC<{
   timer: ReturnType<typeof useTimer>;
-}> = ({ timer }) => (
-  <>
-    {/* Timer Display */}
-    <div className="text-center font-mono font-semibold tracking-wider mb-2" style={{ fontSize: '1.1rem' }}>
-      {formatTimer(timer.time)}
-    </div>
-    {/* Timer Controls */}
-    <div className="flex space-x-2 mb-2">
-      <button
-        onClick={timer.running ? timer.pause : timer.start}
-        disabled={timer.time === 0}
-        className={`px-3 py-1 text-xs rounded ${
-          timer.time === 0
-            ? 'bg-gray-500 text-gray-300 cursor-not-allowed'
-            : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30'
-        }`}
-        aria-label={timer.running ? 'Pause timer' : 'Start timer'}
+  colorMode: ThemeMode;
+}> = ({ timer, colorMode }) => {
+  // Performance: Memoized theme-aware styles
+  const buttonStyles = useMemo(() => ({
+    active: {
+      backgroundColor: getColor('glass.light.20', colorMode),
+      color: getColor('white', colorMode),
+    },
+    disabled: {
+      backgroundColor: getColor('gray.500', colorMode),
+      color: getColor('gray.300', colorMode),
+    },
+  }), [colorMode]);
+
+  const selectStyles = useMemo(() => ({
+    backgroundColor: 'transparent',
+    color: getColor('gray.300', colorMode),
+    border: `1px solid ${getColor('glass.light.30', colorMode)}`,
+  }), [colorMode]);
+
+  return (
+    <>
+      {/* Timer Display */}
+      <div 
+        className="text-center font-mono font-semibold tracking-wider mb-2" 
+        style={{ fontSize: '1.1rem' }}
+        role="status"
+        aria-live="polite"
+        aria-label={`Timer: ${formatTimer(timer.time)}`}
       >
-        {timer.running ? 'Pause' : 'Start'}
-      </button>
-      <button
-        onClick={timer.reset}
-        className="px-3 py-1 text-xs bg-white bg-opacity-20 text-white rounded hover:bg-opacity-30"
-        aria-label="Reset timer"
-      >
-        Reset
-      </button>
-    </div>
-    {/* Timer Duration Selector */}
-    <div className="text-center text-xs text-white text-opacity-70">
-      <select
-        value={timer.duration / 60}
-        onChange={(e) => timer.setDuration(parseInt(e.target.value) * 60)}
-        className="bg-transparent text-white text-opacity-70 border border-white border-opacity-30 rounded px-1"
-        aria-label="Select timer duration"
-      >
-        {TIMER_PRESETS.map(preset => (
-          <option key={preset.value} value={preset.value / 60}>
-            {preset.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  </>
-);
+        {formatTimer(timer.time)}
+      </div>
+      {/* Timer Controls */}
+      <div className="flex space-x-2 mb-2">
+        <button
+          onClick={timer.running ? timer.pause : timer.start}
+          disabled={timer.time === 0}
+          style={timer.time === 0 ? buttonStyles.disabled : buttonStyles.active}
+          className={`px-3 py-1 text-xs rounded ${
+            timer.time === 0 ? 'cursor-not-allowed' : 'hover:bg-opacity-30'
+          }`}
+          aria-label={timer.running ? 'Pause timer' : 'Start timer'}
+        >
+          {timer.running ? 'Pause' : 'Start'}
+        </button>
+        <button
+          onClick={timer.reset}
+          style={buttonStyles.active}
+          className="px-3 py-1 text-xs rounded hover:bg-opacity-30"
+          aria-label="Reset timer"
+        >
+          Reset
+        </button>
+      </div>
+      {/* Timer Duration Selector */}
+      <div className="text-center text-xs text-white text-opacity-70">
+        <select
+          value={timer.duration / 60}
+          onChange={(e) => timer.setDuration(Number(e.target.value) * 60)}
+          style={selectStyles}
+          className="rounded px-1"
+          aria-label="Select timer duration"
+        >
+          {TIMER_PRESETS.map(preset => (
+            <option key={preset.value} value={preset.value / 60}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </>
+  );
+};
 
 // Main component
 export const Clock: React.FC = () => {
+  const { colorMode } = useUIState();
   const [mode, setMode] = useState<ClockMode>('clock');
   const [selectedTimezone, setSelectedTimezone] = useState<Timezone>(TIMEZONES[0]);
 
@@ -513,29 +685,40 @@ export const Clock: React.FC = () => {
   const timer = useTimer();
   const weather = useWeather(selectedTimezone);
 
+  // Performance: Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => 
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches, 
+    []
+  );
+
+  // Performance: Memoized theme-aware styles
+  const containerStyles = useMemo(() => ({
+    backgroundColor: getColor('glass.dark.20', colorMode),
+    border: `1.5px solid ${getColor('glass.light.30', colorMode)}`,
+    backdropFilter: `blur(${blur.lg})`,
+    boxShadow: elevation['2xl'],
+    transition: prefersReducedMotion ? 'none' : `all ${animation.duration.normal} ${animation.easing.smooth}`,
+  }), [colorMode, prefersReducedMotion]);
+
   return (
     <div
       className="flex flex-col items-center justify-center rounded-xl shadow-lg"
       style={{
-        background: 'rgba(30,27,75,0.5)',
-        boxShadow: '0 4px 16px 0 rgba(31,38,135,0.18)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderRadius: '1.2rem',
-        border: '1.5px solid rgba(255,255,255,0.13)',
+        ...containerStyles,
         padding: '1.2rem 1rem 1rem 1rem',
-        minWidth: 210, maxWidth: 230,
+        minWidth: 210, 
+        maxWidth: 230,
       }}
       role="application"
       aria-label="Clock application with time, stopwatch, and timer"
     >
-      <ModeSelector mode={mode} onModeChange={setMode} />
-      <TimezoneSelector timezone={selectedTimezone} onTimezoneChange={setSelectedTimezone} />
-      <AnalogClock time={time} timezone={selectedTimezone} />
+      <ModeSelector mode={mode} onModeChange={setMode} colorMode={colorMode} />
+      <TimezoneSelector timezone={selectedTimezone} onTimezoneChange={setSelectedTimezone} colorMode={colorMode} />
+      <AnalogClock time={time} timezone={selectedTimezone} colorMode={colorMode} />
 
-      {mode === 'clock' && <ClockMode time={time} weather={weather} />}
-      {mode === 'stopwatch' && <StopwatchMode stopwatch={stopwatch} />}
-      {mode === 'timer' && <TimerMode timer={timer} />}
+      {mode === 'clock' && <ClockMode time={time} weather={weather} colorMode={colorMode} />}
+      {mode === 'stopwatch' && <StopwatchMode stopwatch={stopwatch} colorMode={colorMode} />}
+      {mode === 'timer' && <TimerMode timer={timer} colorMode={colorMode} />}
     </div>
   );
 };

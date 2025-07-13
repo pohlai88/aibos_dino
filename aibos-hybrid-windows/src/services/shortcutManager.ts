@@ -1,6 +1,8 @@
 import { useUIState } from '../store/uiState.ts';
 import { SearchProvider } from '../types/search.ts';
 import { createCommandSearchResult } from './searchRegistry.ts';
+// REMOVED: import { logInfo, logWarn } from '../../modules/logging.ts';
+import { EnterpriseLogger } from './core/logger';
 
 export interface ShortcutDefinition {
   id: string;
@@ -46,7 +48,7 @@ class ShortcutManager {
   // Register a new shortcut with conflict detection
   register(shortcut: ShortcutDefinition): void {
     if (this.shortcuts.has(shortcut.id)) {
-      console.warn(`Shortcut ${shortcut.id} already registered, overwriting...`);
+      logWarn(`Shortcut ${shortcut.id} already registered, overwriting...`);
     }
     
     const normalizedShortcut: ShortcutDefinition = {
@@ -69,7 +71,7 @@ class ShortcutManager {
     if (!shortcut) return false;
     
     if (shortcut.isSystem) {
-      console.warn(`Cannot unregister system shortcut: ${shortcutId}`);
+      logWarn(`Cannot unregister system shortcut: ${shortcutId}`);
       return false;
     }
 
@@ -190,7 +192,7 @@ class ShortcutManager {
           
           if (!exists) {
             this.conflicts.push(conflict);
-            console.warn(`Shortcut conflict detected: ${shortcut.key}`, conflict);
+            logWarn(`Shortcut conflict detected: ${shortcut.key}`);
           }
         }
       });
@@ -458,7 +460,7 @@ class ShortcutManager {
       tags: ['close', 'window', 'exit'],
       action: () => {
         // This would need to be implemented based on your window management system
-        console.log('Close active window');
+        logInfo('Close active window');
       },
       context: 'global',
       priority: 60,
@@ -473,7 +475,7 @@ class ShortcutManager {
       icon: '➖',
       tags: ['minimize', 'window', 'hide'],
       action: () => {
-        console.log('Minimize active window');
+        logInfo('Minimize active window');
       },
       context: 'global',
       priority: 60,
@@ -667,4 +669,15 @@ export const useShortcutManager = () => {
     getSearchProvider: shortcutManager.getSearchProvider.bind(shortcutManager),
     getStats: shortcutManager.getStats.bind(shortcutManager)
   };
-}; 
+};
+import { SearchProvider, SearchResult } from '../types/search.ts';
+import { createSearchResult } from './searchRegistry.ts';
+import { EnterpriseLogger } from './core/logger';
+
+class ShortcutManagerProvider implements SearchProvider {
+  private logger = new EnterpriseLogger();
+  
+  // Replace all logging calls:
+  // logInfo('message') → this.logger.info('message', { component: 'ShortcutManager', action: 'actionName' })
+  // logWarn('message') → this.logger.warn('message', { component: 'ShortcutManager', action: 'actionName' })
+}

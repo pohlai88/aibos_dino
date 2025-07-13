@@ -10,9 +10,10 @@
  * - Production-ready build report
  */
 
-import { walk } from "https://deno.land/std@0.208.0/fs/mod.ts";
-import { join, extname, relative, dirname } from "https://deno.land/std@0.208.0/path/mod.ts";
-import * as colors from "https://deno.land/std@0.208.0/fmt/colors.ts";
+import { walk } from 'https://deno.land/std@0.208.0/fs/mod.ts';
+import { join, extname, relative, dirname } from 'https://deno.land/std@0.208.0/path/mod.ts';
+import { writeTextFile, writeJsonFile } from '../modules/filesystem.ts';
+import { logInfo, logWarn, logError, logSuccess } from '../modules/logging.ts';
 
 interface BuildConfig {
   inputDir: string;
@@ -41,10 +42,10 @@ class ProductionBuilder {
   };
 
   private readonly staticExtensions = [
-    ".html", ".css", ".js", ".json",
-    ".png", ".jpg", ".jpeg", ".gif",
-    ".svg", ".ico", ".woff", ".woff2",
-    ".ttf", ".eot"
+    '.html', '.css', '.js', '.json',
+    '.png', '.jpg', '.jpeg', '.gif',
+    '.svg', '.ico', '.woff', '.woff2',
+    '.ttf', '.eot'
   ];
 
   constructor(config: BuildConfig) {
@@ -54,7 +55,7 @@ class ProductionBuilder {
   async build(): Promise<void> {
     this.stats.startTime = Date.now();
 
-    console.log(colors.bold(colors.cyan("\n🚀 Starting AIBOS Production Build...")));
+    logInfo('🚀 Starting AIBOS Production Build...');
 
     try {
       await this.ensureOutputDir();
@@ -63,7 +64,7 @@ class ProductionBuilder {
       this.stats.endTime = Date.now();
       this.generateBuildReport();
     } catch (error) {
-      console.error(colors.red(`❌ Build failed: ${error.message}`));
+      logError(`❌ Build failed: ${error instanceof Error ? error.message : String(error)}`);
       Deno.exit(1);
     }
   }
@@ -71,10 +72,10 @@ class ProductionBuilder {
   private async ensureOutputDir(): Promise<void> {
     try {
       await Deno.mkdir(this.config.outputDir, { recursive: true });
-      console.log(colors.green(`📁 Created output directory: ${this.config.outputDir}`));
+      logSuccess(`📁 Created output directory: ${this.config.outputDir}`);
     } catch (error) {
       if (error instanceof Deno.errors.AlreadyExists) {
-        console.log(colors.yellow(`📁 Output directory exists: ${this.config.outputDir}`));
+        logWarn(`📁 Output directory exists: ${this.config.outputDir}`);
       } else {
         throw error;
       }
@@ -82,10 +83,10 @@ class ProductionBuilder {
   }
 
   private async processSourceFiles(): Promise<void> {
-    console.log(colors.yellow("\n🔧 Processing TypeScript and TSX files..."));
+    logInfo('🔧 Processing TypeScript and TSX files...');
 
     for await (const entry of walk(this.config.inputDir, {
-      exts: [".ts", ".tsx"],
+      exts: ['.ts', '.tsx'],
       skip: [/node_modules/, /\.git/, /dist/, /build/, /scripts/]
     })) {
       if (entry.isFile) {
@@ -117,13 +118,13 @@ class ProductionBuilder {
     // Ensure output subdirectory exists
     await Deno.mkdir(dirname(outputPath), { recursive: true });
 
-    await Deno.writeTextFile(outputPath, modified);
+    await writeTextFile(outputPath, modified);
 
     const fileSize = (await Deno.stat(outputPath)).size;
     this.stats.totalSize += fileSize;
     this.stats.filesProcessed++;
 
-    console.log(colors.gray(`✅ Processed: ${relativePath}`));
+    logInfo(`✅ Processed: ${relativePath}`);
   }
 
   private removeConsoleStatements(content: string): [string, number] {
@@ -142,7 +143,7 @@ class ProductionBuilder {
     patterns.forEach((pattern) => {
       content = content.replace(pattern, () => {
         logsRemoved++;
-        return "";
+        return '';
       });
     });
 
@@ -152,17 +153,17 @@ class ProductionBuilder {
   private minifyCode(content: string): string {
     return content
       // Remove single-line comments (avoid removing JSX comments)
-      .replace(/\/\/.*$/gm, "")
+      .replace(/\/\/.*$/gm, '')
       // Remove multi-line comments
-      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, '')
       // Remove extra spaces
-      .replace(/\s+/g, " ")
+      .replace(/\s+/g, ' ')
       // Trim trailing whitespace
       .trim();
   }
 
   private async copyStaticAssets(): Promise<void> {
-    console.log(colors.yellow("\n📁 Copying static assets..."));
+    logInfo('📁 Copying static assets...');
 
     for await (const entry of walk(this.config.inputDir, {
       skip: [/node_modules/, /\.git/, /dist/, /build/, /scripts/]
@@ -177,7 +178,7 @@ class ProductionBuilder {
         const fileSize = (await Deno.stat(outputPath)).size;
         this.stats.totalSize += fileSize;
 
-        console.log(colors.gray(`📄 Copied: ${relativePath}`));
+        logInfo(`📄 Copied: ${relativePath}`);
       }
     }
   }
@@ -189,37 +190,50 @@ class ProductionBuilder {
   private generateBuildReport(): void {
     const duration = (this.stats.endTime - this.stats.startTime) / 1000;
 
-    console.log(colors.cyan("\n📊 BUILD REPORT"));
-    console.log(colors.cyan("=".repeat(50)));
-    console.log(`Files processed: ${this.stats.filesProcessed}`);
-    console.log(`Console logs removed: ${this.stats.logsRemoved}`);
-    console.log(`Total output size: ${this.formatBytes(this.stats.totalSize)}`);
-    console.log(`Minification: ${this.config.minify ? "Enabled" : "Disabled"}`);
-    console.log(`Source maps: ${this.config.sourceMaps ? "Enabled" : "Disabled"}`);
-    console.log(`Duration: ${duration.toFixed(2)}s`);
-    console.log(colors.cyan("=".repeat(50)));
-    console.log(colors.green("🎉 Production build completed successfully!\n"));
+    logInfo('📊 BUILD REPORT');
+    logInfo('='.repeat(50));
+    logInfo(`Files processed: ${this.stats.filesProcessed}`);
+    logInfo(`Console logs removed: ${this.stats.logsRemoved}`);
+    logInfo(`Total output size: ${this.formatBytes(this.stats.totalSize)}`);
+    logInfo(`Minification: ${this.config.minify ? 'Enabled' : 'Disabled'}`);
+    logInfo(`Source maps: ${this.config.sourceMaps ? 'Enabled' : 'Disabled'}`);
+    logInfo(`Duration: ${duration.toFixed(2)}s`);
+    logInfo('='.repeat(50));
+
+    // Save build report
+    const report = {
+      timestamp: new Date().toISOString(),
+      stats: this.stats,
+      config: this.config,
+      duration: duration
+    };
+
+    writeJsonFile('build-report.json', report);
+    logSuccess('📄 Build report saved: build-report.json');
   }
 
   private formatBytes(bytes: number): string {
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-    if (bytes === 0) return "0 Bytes";
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 }
 
-// Load CLI args (basic example)
-const buildConfig: BuildConfig = {
-  inputDir: ".",
-  outputDir: "./dist",
-  removeConsoleLogs: true,
-  minify: true,
-  sourceMaps: false,
-};
+async function main() {
+  const config: BuildConfig = {
+    inputDir: '.',
+    outputDir: 'dist',
+    removeConsoleLogs: true,
+    minify: true,
+    sourceMaps: false
+  };
 
-// Run the build
-if (import.meta.main) {
-  const builder = new ProductionBuilder(buildConfig);
+  const builder = new ProductionBuilder(config);
   await builder.build();
+}
+
+if (import.meta.main) {
+  await main();
 }

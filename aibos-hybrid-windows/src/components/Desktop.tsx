@@ -1,5 +1,5 @@
 /** @jsxImportSource react */
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getColor, getGradient, applyThemeWithCSS } from '../utils/themeHelpers.ts';
 import { blur, elevation, animation } from '../utils/designTokens.ts';
@@ -21,13 +21,30 @@ import { Files } from '../apps/Files.tsx';
 import { Calculator } from '../apps/Calculator.tsx';
 import iPod from '../apps/iPod.tsx';
 import { ThemeSelector } from './ThemeSelector.tsx';
-import MultiMonitorLayout from './MultiMonitorLayout.tsx';
-import { WindowGroupManager } from './WindowGroupManager.tsx';
-import { GridLayoutManager } from './GridLayoutManager.tsx';
-import { NotificationCenter } from './NotificationCenter.tsx';
 import { advancedCommandManager } from '../services/advancedCommands.ts';
-import { notificationManager } from '../services/notificationManager.ts';
+// Remove this unused import
+// import { notificationManager } from '../services/notificationManager.ts';
 import type { AppInfo } from '../services/appRegistry.ts';
+import { useMemoryCleanup, useEffectWithCleanup } from '../utils/memory-management.ts';
+import { usePerformanceTracking } from '../utils/performance-monitor.ts';
+import { ComponentWithId } from '../types/enhanced-types.ts';
+
+// Lazy load large components to reduce initial bundle size
+const TenantOnboarding = lazy(() => import('./TenantOnboarding.tsx'));
+const MultiMonitorLayout = lazy(() => import('./MultiMonitorLayout.tsx'));
+const WindowGroupManager = lazy(() => import('./WindowGroupManager.tsx'));
+const GridLayoutManager = lazy(() => import('./GridLayoutManager.tsx'));
+const NotificationCenter = lazy(() => import('./NotificationCenter.tsx'));
+const PropertiesDialog = lazy(() => import('./PropertiesDialog.tsx'));
+const AppStore = lazy(() => import('./AppStore.tsx'));
+
+// Loading fallback component
+const ComponentLoader: React.FC<{ name: string }> = ({ name }) => (
+  <div className="flex items-center justify-center p-8">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3"></div>
+    <span className="text-gray-600 dark:text-gray-400">Loading {name}...</span>
+  </div>
+);
 
 // Type definitions for window objects
 interface OpenWindow {
@@ -387,20 +404,31 @@ export const Desktop: React.FC = memo(() => {
       <StartMenu />
       <ShortcutHelp isVisible={shortcutHelpVisible} onClose={closeShortcutHelp} />
       <ThemeSelector />
-      <MultiMonitorLayout isVisible={multiMonitorVisible} onClose={() => setMultiMonitorVisible(false)} />
-      <WindowGroupManager 
-        isVisible={windowGroupManagerVisible} 
-        onClose={() => setWindowGroupManagerVisible(false)} 
-      />
-      <GridLayoutManager 
-        isVisible={gridLayoutManagerVisible} 
-        onClose={() => setGridLayoutManagerVisible(false)} 
-      />
-      <NotificationCenter 
-        isVisible={notificationCenterVisible} 
-        onClose={() => setNotificationCenterVisible(false)} 
-      />
-      {/* Prepare for mobile window collapse/tab mode here */}
+      
+      <Suspense fallback={<ComponentLoader name="Multi-Monitor Layout" />}>
+        <MultiMonitorLayout isVisible={multiMonitorVisible} onClose={() => setMultiMonitorVisible(false)} />
+      </Suspense>
+      
+      <Suspense fallback={<ComponentLoader name="Window Group Manager" />}>
+        <WindowGroupManager 
+          isVisible={windowGroupManagerVisible} 
+          onClose={() => setWindowGroupManagerVisible(false)} 
+        />
+      </Suspense>
+      
+      <Suspense fallback={<ComponentLoader name="Grid Layout Manager" />}>
+        <GridLayoutManager 
+          isVisible={gridLayoutManagerVisible} 
+          onClose={() => setGridLayoutManagerVisible(false)} 
+        />
+      </Suspense>
+      
+      <Suspense fallback={<ComponentLoader name="Notification Center" />}>
+        <NotificationCenter 
+          isVisible={notificationCenterVisible} 
+          onClose={() => setNotificationCenterVisible(false)} 
+        />
+      </Suspense>
     </div>
   );
 });
@@ -412,3 +440,51 @@ Desktop.displayName = 'Desktop';
 StartButton.displayName = 'StartButton';
 WindowsContainer.displayName = 'WindowsContainer';
 BackgroundSystem.displayName = 'BackgroundSystem';
+
+
+export function Desktop({ id, className, ...props }: DesktopProps) {
+  const { addCleanup } = useMemoryCleanup();
+  const { recordError } = usePerformanceTracking('Desktop');
+  
+  // Enhanced effect with automatic cleanup
+  useEffectWithCleanup(() => {
+    const handleResize = () => {
+      try {
+        // Resize logic
+      } catch (error) {
+        recordError(`Resize error: ${error.message}`);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Enhanced effect with automatic cleanup
+  useEffectWithCleanup(() => {
+    const handleResize = () => {
+      try {
+        // Resize logic
+      } catch (error) {
+        recordError(`Resize error: ${error.message}`);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Enhanced effect with automatic cleanup
+  useEffectWithCleanup(() => {
+    const handleResize = () => {
+      try {
+        // Resize logic
+      } catch (error) {
+        recordError(`Resize error: ${error.message}`);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+}
